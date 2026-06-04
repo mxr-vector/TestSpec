@@ -1,0 +1,57 @@
+{
+  "name": "test-pilot",
+  "version": "0.1.0",
+  "description": "Requirement-driven test design CLI for AI-assisted QA workflows.",
+  "type": "module",
+  "bin": {
+    "testpilot": "./dist/run.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx bin/run.ts",
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "biome check .",
+    "clean": "rm -rf dist",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "cli",
+    "testing",
+    "qa",
+    "test-case",
+    "requirements",
+    "ai",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "commander": "^15.0.0",
+    "fast-glob": "^3.3.3",
+    "inquirer": "^14.0.2",
+    "ora": "^9.4.0",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.0",
+    "@types/node": "^25.9.1",
+    "tsup": "^8.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.0.0"
+  }
+}
