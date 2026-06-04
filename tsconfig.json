@@ -13,13 +13,10 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
+    "noEmit": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
-    "moduleDetection": "force",
-    "resolveJsonModule": true
+    "moduleDetection": "force"
   },
   "include": ["bin/**/*.ts", "src/**/*.ts", "tests/**/*.ts", "tsup.config.ts", "vitest.config.ts"],
   "exclude": ["dist", "node_modules"]
