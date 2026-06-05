@@ -276,7 +276,7 @@ export async function promptAgentSelection(
     writeStream.write("Use ↑/↓ to move, Space to select, Enter to confirm.\n\n");
     for (const [index, item] of items.entries()) {
       const pointer = index === cursor ? "›" : " ";
-      const check = item.selected ? "◉" : "○";
+      const check = item.selected ? "\x1B[32m◉\x1B[0m" : "○";
       writeStream.write(
         `${pointer} ${check} ${item.integration.displayName} - ${item.integration.description}\n`
       );
@@ -464,7 +464,7 @@ function agentWorkflowInstructions(command: WorkflowCommand): string[] {
       "Agent workflow:",
       "",
       "1. Read `proposal.md`, `requirements-analysis.md`, `specs/testpoints.md`, and available requirement evidence.",
-      "2. Generate or update `artifacts/testcases.json` with concrete test data, executable steps, observable expected results, requirement/test-point/risk traceability, and `sourceRefs`.",
+      "2. Generate or update `artifacts/testcases.json` with executable steps, observable expected results, requirement/test-point/risk traceability, and `sourceRefs`; include separate test data only when requirement evidence or executability requires it.",
       "3. Run `testspec validate [name]` and fix blocking errors before export.",
       "4. Run the backing CLI export command:",
       "",
@@ -536,7 +536,7 @@ function renderAgentsSection(selectedAgents: readonly AgentId[]): string {
     "1. `test:new` creates `testspec/changes/<name>/proposal.md`.",
     "2. `test:analysis` creates grounded `requirements-analysis.md` from requirement evidence.",
     "3. `test:points` creates traceable `specs/testpoints.md`.",
-    "4. `test:excel` creates concrete `artifacts/testcases.json`, runs `testspec validate`, and exports `artifacts/<name>_cases.xlsx`.",
+    "4. `test:excel` creates executable `artifacts/testcases.json`, runs `testspec validate`, and exports compact `artifacts/<name>_cases.xlsx`.",
     "5. `test:validate` can be run independently to check schema, traceability, and quality.",
     "6. `test:mind` creates `artifacts/<name>_cases.xmind` from the same structured cases.",
     "7. `test:report` creates `report.md` after Excel execution results are filled.",
@@ -555,7 +555,7 @@ function agentBehaviorSummary(command: WorkflowCommand): string {
     return "Agent derives traceable `specs/testpoints.md` from analysis and source evidence.";
   }
   if (command.id === "excel") {
-    return "Agent writes concrete `artifacts/testcases.json`, validates it, then exports Excel.";
+    return "Agent writes executable `artifacts/testcases.json`, validates it, then exports compact Excel.";
   }
   if (command.id === "validate") {
     return "CLI validates schema, traceability, and quality of generated artifacts.";

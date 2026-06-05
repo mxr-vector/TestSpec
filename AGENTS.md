@@ -25,7 +25,7 @@ Workflow labels and backing CLI commands:
 | `test:analysis` | `testspec analysis [name]` | Agent reads the requirement source and writes grounded `requirements-analysis.md`. |
 | `test:points` | `testspec points [name]` | Agent derives traceable `specs/testpoints.md` from analysis and source evidence. |
 | `test:validate` | `testspec validate [name]` | CLI validates schema, traceability, and quality of generated artifacts. |
-| `test:excel` | `testspec excel [name]` | Agent writes concrete `artifacts/testcases.json`, validates it, then exports Excel. |
+| `test:excel` | `testspec excel [name]` | Agent writes executable `artifacts/testcases.json`, validates it, then exports compact Excel. |
 | `test:mind` | `testspec mind [name]` | Export mind-map style test cases for review. |
 | `test:report` | `testspec report [name]` | Generate execution statistics from Excel results. |
 | `test:archive` | `testspec archive [name]` | Archive the full test artifact chain for traceability. |
@@ -35,7 +35,7 @@ Recommended order:
 1. `test:new` creates `testspec/changes/<name>/proposal.md`.
 2. `test:analysis` creates grounded `requirements-analysis.md` from requirement evidence.
 3. `test:points` creates traceable `specs/testpoints.md`.
-4. `test:excel` creates concrete `artifacts/testcases.json`, runs `testspec validate`, and exports `artifacts/<name>_cases.xlsx`.
+4. `test:excel` creates executable `artifacts/testcases.json`, runs `testspec validate`, and exports compact `artifacts/<name>_cases.xlsx`.
 5. `test:validate` can be run independently to check schema, traceability, and quality.
 6. `test:mind` creates `artifacts/<name>_cases.xmind` from the same structured cases.
 7. `test:report` creates `report.md` after Excel execution results are filled.

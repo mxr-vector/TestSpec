@@ -6,19 +6,16 @@ import type { TestCase } from "./testcases.js";
 export const FUNCTIONAL_EXCEL_HEADERS = [
   "功能模块",
   "需求编号",
-  "测试点编号",
   "用例编号",
   "用例名称",
   "用例类型",
   "前置条件",
-  "测试数据",
   "测试步骤",
   "预期结果",
   "优先级",
   "执行结果",
   "实际结果",
   "缺陷编号",
-  "备注",
 ] as const;
 
 export const PERFORMANCE_EXCEL_HEADERS = [
@@ -27,10 +24,8 @@ export const PERFORMANCE_EXCEL_HEADERS = [
   "场景名称",
   "性能测试类型",
   "关联需求编号",
-  "关联测试点编号",
   "测试目标",
   "前置条件",
-  "测试数据",
   "并发用户数",
   "持续时间",
   "压测步骤",
@@ -38,13 +33,8 @@ export const PERFORMANCE_EXCEL_HEADERS = [
   "实际 TPS/QPS",
   "平均响应时间(ms)",
   "P95响应时间(ms)",
-  "P99响应时间(ms)",
   "错误率(%)",
-  "CPU峰值(%)",
-  "内存峰值(%)",
-  "瓶颈分析",
   "执行结果",
-  "备注",
 ] as const;
 
 export interface ExecutionRow {
@@ -152,29 +142,18 @@ function functionalRows(cases: TestCase[]): string[][] {
     ...cases.map((testCase) => [
       testCase.module,
       testCase.requirementIds.join(", "),
-      testCase.testPointIds.join(", "),
       testCase.caseId,
       testCase.title,
       testCase.type,
       testCase.preconditions,
-      testCase.testData ?? "",
       testCase.steps.map((step, index) => `${index + 1}. ${step}`).join("\n"),
       testCase.expectedResult,
       testCase.priority,
       testCase.executionResult ?? "未执行",
       testCase.actualResult ?? "",
       testCase.defectId ?? "",
-      testCase.notes ?? formatSourceRefs(testCase.sourceRefs ?? []),
     ]),
   ];
-}
-
-function formatSourceRefs(sourceRefs: NonNullable<TestCase["sourceRefs"]>): string {
-  return sourceRefs
-    .map((sourceRef) =>
-      [sourceRef.document, sourceRef.section, sourceRef.quote].filter(Boolean).join(" | ")
-    )
-    .join("\n");
 }
 
 function performanceRows(cases: PerformanceCase[]): string[][] {
@@ -186,10 +165,8 @@ function performanceRows(cases: PerformanceCase[]): string[][] {
       testCase.scenarioName,
       testCase.performanceType,
       testCase.requirementIds.join(", "),
-      testCase.testPointIds.join(", "),
       testCase.objective,
       testCase.preconditions,
-      testCase.testData,
       testCase.concurrentUsers,
       testCase.duration,
       testCase.steps.map((step, index) => `${index + 1}. ${step}`).join("\n"),
@@ -197,13 +174,8 @@ function performanceRows(cases: PerformanceCase[]): string[][] {
       testCase.actualThroughput,
       testCase.avgResponseTime,
       testCase.p95ResponseTime,
-      testCase.p99ResponseTime,
       testCase.errorRate,
-      testCase.cpuPeak,
-      testCase.memoryPeak,
-      testCase.bottleneckAnalysis,
       testCase.executionResult,
-      testCase.notes,
     ]),
   ];
 }

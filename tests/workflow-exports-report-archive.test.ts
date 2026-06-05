@@ -140,12 +140,20 @@ describe("structured cases and exports", () => {
     expect(relationshipsXml).toContain('Target="worksheets/sheet2.xml"');
     expect(contentTypesXml).toContain("/xl/worksheets/sheet2.xml");
     expect(functionalSheetXml).toContain("需求编号");
-    expect(functionalSheetXml).toContain("测试点编号");
+    expect(functionalSheetXml).not.toContain("测试点编号");
+    expect(functionalSheetXml).not.toContain("<t>测试数据</t>");
+    expect(functionalSheetXml).not.toContain("备注");
     expect(functionalSheetXml).toContain("REQ-001");
-    expect(functionalSheetXml).toContain("TP-001");
     expect(functionalSheetXml).toContain("实际结果");
     expect(performanceSheetXml).toContain("场景编号");
     expect(performanceSheetXml).toContain("P95响应时间(ms)");
+    expect(performanceSheetXml).not.toContain("关联测试点编号");
+    expect(performanceSheetXml).not.toContain("<t>测试数据</t>");
+    expect(performanceSheetXml).not.toContain("备注");
+    expect(performanceSheetXml).not.toContain("P99响应时间(ms)");
+    expect(performanceSheetXml).not.toContain("CPU峰值(%)");
+    expect(performanceSheetXml).not.toContain("内存峰值(%)");
+    expect(performanceSheetXml).not.toContain("瓶颈分析");
   });
 
   it("omits the performance sheet when there are no performance cases", async () => {
@@ -258,8 +266,10 @@ describe("validation", () => {
     expect(validation.errors).toHaveLength(0);
     expect(formatValidationResult(validation)).toContain("Validation errors: 0");
     expect(cases[0]?.title).toBe("有效账号密码登录成功");
-    expect(functionalSheetXml).toContain("username=user-a; password=ValidPass123");
-    expect(functionalSheetXml).toContain("source checked");
+    expect(cases[0]?.testData).toBe("username=user-a; password=ValidPass123");
+    expect(cases[0]?.notes).toBe("source checked");
+    expect(functionalSheetXml).not.toContain("username=user-a; password=ValidPass123");
+    expect(functionalSheetXml).not.toContain("source checked");
   });
 
   it("reports schema, traceability, and quality validation issues", async () => {

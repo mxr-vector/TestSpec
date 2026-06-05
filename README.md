@@ -122,10 +122,12 @@ When a command accepts `[name]`, TestSpec uses the explicit name if provided. If
 
 `testspec excel [name]` exports `artifacts/<name>_cases.xlsx` with two worksheets:
 
-| Worksheet  | Purpose                                                                                                               |
-| ---------- | --------------------------------------------------------------------------------------------------------------------- |
-| `功能测试` | Functional test cases with requirement IDs, test point IDs, steps, expected results, priority, and execution tracking |
-| `性能测试` | Performance scenarios derived from proposal and test points                                                           |
+| Worksheet  | Purpose                                                                                                      |
+| ---------- | ------------------------------------------------------------------------------------------------------------ |
+| `功能测试` | Compact functional test cases with requirement IDs, steps, expected results, priority, and execution tracking |
+| `性能测试` | Compact performance scenarios with baseline targets, metrics, and execution tracking                          |
+
+The Excel workbook is execution-oriented. Detailed traceability such as test point IDs, risk IDs, source evidence, and optional test data remains available in `artifacts/testcases.json` and related JSON artifacts instead of being exported as low-value columns.
 
 The performance worksheet is generated from deterministic rules:
 

@@ -1,6 +1,6 @@
 {
   "name": "@wangjh2001/test-spec",
-  "version": "0.7.3",
+  "version": "0.7.5",
   "author": "YuanJie",
   "license": "MIT",
   "description": "Requirement-driven test design CLI for AI-assisted QA workflows.",
