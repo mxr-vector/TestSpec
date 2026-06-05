@@ -199,20 +199,51 @@ describe("structured cases and exports", () => {
     expect(workbook["xl/worksheets/sheet2.xml"]).toBeUndefined();
   });
 
-  it("preserves existing structured cases when test points change", async () => {
+  it("preserves and normalizes existing structured cases when test points change", async () => {
     const workspace = await createChangeWorkspace("login-v2");
     await writeTestPoints(workspace);
     await generateStructuredCases(workspace);
+    await writeFile(
+      join(workspace.artifactsDir, "testcases.json"),
+      `${JSON.stringify(
+        [
+          {
+            caseId: "TC-001",
+            title: "已有成功路径",
+            module: "登录",
+            type: "正向",
+            priority: "P0",
+            preconditions: "用户已注册。",
+            testData: "username=user-a",
+            steps: ["打开登录页", "输入有效账号密码", "点击登录"],
+            expectedResult: "系统跳转到首页并展示登录态。",
+            notes: "legacy note",
+          },
+        ],
+        null,
+        2
+      )}\n`
+    );
     await writeFile(
       join(workspace.specsDir, "testpoints.md"),
       ["# 测试点清单：login-v2", "", "## 核心流程", "", "- [TP-001] 新成功路径。"].join("\n")
     );
 
     const cases = await readOrGenerateStructuredCases(workspace);
+    const persisted = JSON.parse(
+      await readFile(join(workspace.artifactsDir, "testcases.json"), "utf8")
+    ) as Record<string, unknown>[];
 
-    expect(cases[0]).not.toMatchObject({ title: "新成功路径。" });
-    expect(cases[0]).not.toHaveProperty("notes");
-    expect(cases[0]).not.toHaveProperty("testData");
+    expect(cases[0]).toMatchObject({ title: "已有成功路径" });
+    expect(persisted[0]).toEqual({
+      title: "已有成功路径",
+      module: "登录",
+      type: "正向",
+      priority: "P0",
+      preconditions: "用户已注册。",
+      steps: ["打开登录页", "输入有效账号密码", "点击登录"],
+      expectedResult: "系统跳转到首页并展示登录态。",
+    });
   });
 });
 
@@ -272,13 +303,13 @@ describe("validation", () => {
     expect(validation.errors).toHaveLength(0);
     expect(formatValidationResult(validation)).toContain("Validation errors: 0");
     expect(cases[0]?.title).toBe("有效账号密码登录成功");
-    expect(cases[0]?.testData).toBe("username=user-a; password=ValidPass123");
-    expect(cases[0]?.notes).toBe("source checked");
+    expect(cases[0]).not.toHaveProperty("testData");
+    expect(cases[0]).not.toHaveProperty("notes");
     expect(functionalSheetXml).not.toContain("username=user-a; password=ValidPass123");
     expect(functionalSheetXml).not.toContain("source checked");
   });
 
-  it("reports schema, traceability, and quality validation issues", async () => {
+  it("reports schema and quality validation issues after compact normalization", async () => {
     const workspace = await createChangeWorkspace("bad-cases");
     await writeFile(
       join(workspace.specsDir, "testpoints.md"),
@@ -329,57 +360,28 @@ describe("validation", () => {
     const validation = await validateWorkflowArtifacts(workspace);
     const output = formatValidationResult(validation);
 
+    const persistedAfterValidation = JSON.parse(
+      await readFile(join(workspace.artifactsDir, "testcases.json"), "utf8")
+    ) as Record<string, unknown>[];
+
     expect(validation.errors.some((issue) => issue.code === "MISSING_FIELD")).toBe(false);
-    expect(validation.errors.some((issue) => issue.code === "UNKNOWN_TEST_POINT")).toBe(true);
+    expect(validation.errors.some((issue) => issue.code === "UNKNOWN_TEST_POINT")).toBe(false);
     expect(validation.warnings.some((issue) => issue.code === "MISSING_SOURCE_REFS")).toBe(false);
-    expect(validation.warnings.some((issue) => issue.code === "VERBOSE_COMPACT_FIELD")).toBe(true);
-    expect(validation.warnings.some((issue) => issue.code === "UNKNOWN_REQUIREMENT")).toBe(true);
+    expect(validation.warnings.some((issue) => issue.code === "VERBOSE_COMPACT_FIELD")).toBe(false);
+    expect(validation.warnings.some((issue) => issue.code === "UNKNOWN_REQUIREMENT")).toBe(false);
     expect(validation.warnings.some((issue) => issue.code === "GENERIC_STEPS")).toBe(true);
     expect(validation.warnings.some((issue) => issue.code === "VAGUE_EXPECTED_RESULT")).toBe(true);
+    expect(persistedAfterValidation[0]).toHaveProperty("caseId", "TC-001");
+
+    await readOrGenerateStructuredCases(workspace);
+    const persistedAfterNormalization = JSON.parse(
+      await readFile(join(workspace.artifactsDir, "testcases.json"), "utf8")
+    ) as Record<string, unknown>[];
+    expect(persistedAfterNormalization[0]).not.toHaveProperty("caseId");
+
     expect(output).toContain("[WARN] GENERIC_STEPS case[1]");
     expect(output).toContain("Validation errors:");
     expect(output).toContain("Validation warnings:");
-  });
-
-  it("warns when all cases link only to REQ-001 despite multiple requirements", async () => {
-    const workspace = await createChangeWorkspace("req001-only");
-    await writeFile(
-      join(workspace.specsDir, "testpoints.md"),
-      [
-        "# 测试点清单：req001-only",
-        "",
-        "## 核心流程",
-        "",
-        "- [TP-001] 覆盖 REQ-001 登录 的主要成功路径。",
-        "- [TP-002] 覆盖 REQ-002 注册 的主要成功路径。",
-      ].join("\n")
-    );
-    await writeFile(
-      join(workspace.artifactsDir, "testcases.json"),
-      `${JSON.stringify(
-        ["001", "002"].map((id) => ({
-          caseId: `TC-${id}`,
-          title: `账号用例 ${id}`,
-          module: "账号",
-          type: "正向",
-          priority: "P1",
-          requirementIds: ["REQ-001"],
-          testPointIds: [`TP-${id}`],
-          riskIds: [],
-          sourceRefs: [{ document: "docs/account.md", section: `TP-${id}` }],
-          preconditions: "用户账号可用。",
-          steps: ["打开账号页面", "输入有效数据", `点击提交 ${id}`],
-          expectedResult: `完成账号场景 ${id} 并展示成功结果。`,
-        })),
-        null,
-        2
-      )}\n`
-    );
-
-    const validation = await validateWorkflowArtifacts(workspace);
-
-    expect(validation.errors).toHaveLength(0);
-    expect(validation.warnings.some((issue) => issue.code === "SUSPICIOUS_REQ001_ONLY")).toBe(true);
   });
 
   it("does not cascade unknown test point errors when testpoints are unreadable", async () => {

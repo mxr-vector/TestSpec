@@ -94,6 +94,10 @@ describe("initializeTestSpec", () => {
       expect(content).toContain(command.label);
       expect(content).toContain(command.backingCommand);
       expect(content).toContain("Provider-neutral generation rules");
+      expect(content).toContain("User arguments: $ARGUMENTS");
+      expect(content).toContain("argument-hint:");
+      expect(content).not.toContain("category: TestSpec");
+      expect(content).not.toContain("tags: [testspec, workflow, test]");
     }
   });
 
@@ -114,7 +118,11 @@ describe("initializeTestSpec", () => {
     expect(analysis).toContain("Generate `requirements-analysis.md` with requirement IDs");
     expect(points).toContain("Generate `specs/testpoints.md` with stable `TP-xxx` IDs");
     expect(excel).toContain("Generate or update `artifacts/testcases.json`");
+    expect(excel).toContain("using exactly this schema: `title`, `module`, `type`, `priority`, `preconditions`, `steps`, `expectedResult`");
     expect(excel).toContain("Run `testspec validate [name]`");
+    expect(excel).not.toContain("Do not generate verbose/runtime fields");
+    expect(excel).not.toContain("caseId");
+    expect(excel).not.toContain("testData");
   });
 
   it("generates all Qoder workflow command files", async () => {
@@ -145,6 +153,8 @@ describe("initializeTestSpec", () => {
     expect(content).toContain("testspec new <name> --requirement <path>");
     expect(content).toContain("agent-executed generation and CLI-managed validation/export");
     expect(content).toContain("testspec validate [name]");
+    expect(content).toContain("compact test cases use only the executable schema");
+    expect(content).not.toContain("compact test cases do not need to duplicate");
   });
 
   it("creates AGENTS.md for generic agent guidance", async () => {

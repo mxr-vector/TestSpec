@@ -12,7 +12,7 @@ Provider-neutral generation rules:
 - The coding agent performs semantic generation; the TestSpec CLI remains provider-free and deterministic.
 - Always read `proposal.md` and the referenced requirement document before generating semantic artifacts.
 - If the requirement document is missing, unreadable, remote, or ambiguous, stop and ask the user for readable content or explicit authorization; do not guess.
-- Keep traceability in requirement analysis and test-point artifacts when available; compact test cases do not need to duplicate per-case test point IDs or source evidence by default.
+- Keep traceability in requirement analysis and test-point artifacts; compact test cases use only the executable schema: `title`, `module`, `type`, `priority`, `preconditions`, `steps`, `expectedResult`.
 - Use `待确认` or clarification questions for unspecified behavior instead of fabricating business rules, roles, state transitions, limits, or SLA values.
 - Generate concrete executable steps and observable expected results; avoid generic template wording such as 'execute operation' or '符合需求'.
 - Run `testspec validate [name]` before export workflows and fix blocking validation errors before producing Excel or mind-map artifacts.
@@ -35,7 +35,7 @@ Recommended order:
 1. `test:new` creates `testspec/changes/<name>/proposal.md`.
 2. `test:analysis` creates grounded `requirements-analysis.md` from requirement evidence.
 3. `test:points` creates traceable `specs/testpoints.md`.
-4. `test:excel` creates compact executable `artifacts/testcases.json` using only default case fields (`title`, `module`, `type`, `priority`, `preconditions`, `steps`, `expectedResult`), runs `testspec validate`, and exports compact `artifacts/<name>_cases.xlsx`.
+4. `test:excel` creates compact executable `artifacts/testcases.json` using exactly the schema `title`, `module`, `type`, `priority`, `preconditions`, `steps`, `expectedResult`; runs `testspec validate`; and exports compact `artifacts/<name>_cases.xlsx`.
 5. `test:validate` can be run independently to check compact schema and quality.
 6. `test:mind` creates `artifacts/<name>_cases.xmind` from the same structured cases.
 7. `test:report` creates `report.md` after Excel execution results are filled.

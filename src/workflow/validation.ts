@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { TestCase } from "./testcases.js";
+import { readCompactStructuredCases, type TestCase } from "./testcases.js";
 import type { ChangeWorkspace } from "./workspace.js";
 
 export type ValidationLevel = "error" | "warning";
@@ -40,29 +40,18 @@ const VAGUE_EXPECTED_RESULT_PATTERNS = [
   /^system behaves as expected[.]?$/i,
 ];
 
-const VERBOSE_COMPACT_FIELDS = [
-  "testData",
-  "executionResult",
-  "actualResult",
-  "defectId",
-  "notes",
-  "sourceRefs",
-  "riskIds",
-  "testPointIds",
-  "requirementIds",
-] as const;
-
 export async function validateWorkflowArtifacts(
   workspace: ChangeWorkspace
 ): Promise<ValidationResult> {
   const issues: ValidationIssue[] = [];
-  const testpoints = await readTestPoints(workspace, issues);
+  // Keep this read to report missing or unreadable workflow artifacts even though compact cases
+  // no longer carry per-case traceability links.
+  await readTestPoints(workspace, issues);
   const cases = await readTestCases(workspace, issues);
 
   if (cases.length > 0) {
     validateCaseSchema(cases, issues);
-    validateTraceability(cases, testpoints, issues);
-    validateQuality(cases, testpoints, issues);
+    validateQuality(cases, issues);
   }
 
   return splitIssues(issues);
@@ -87,23 +76,14 @@ async function readTestCases(
   workspace: ChangeWorkspace,
   issues: ValidationIssue[]
 ): Promise<TestCase[]> {
-  const testcasesPath = join(workspace.artifactsDir, "testcases.json");
-
   try {
-    const content = await readFile(testcasesPath, "utf8");
-    const parsed = JSON.parse(content) as unknown;
-    if (!Array.isArray(parsed)) {
-      issues.push(error("TESTCASES_NOT_ARRAY", "artifacts/testcases.json must be a JSON array."));
-      return [];
-    }
-    return parsed as TestCase[];
+    return await readCompactStructuredCases(workspace);
   } catch (errorValue) {
-    issues.push(
-      error(
-        "TESTCASES_UNREADABLE",
-        `Unable to read or parse artifacts/testcases.json: ${errorMessage(errorValue)}`
-      )
-    );
+    const message = errorMessage(errorValue);
+    const code = message.includes("must be a JSON array")
+      ? "TESTCASES_NOT_ARRAY"
+      : "TESTCASES_UNREADABLE";
+    issues.push(error(code, `Unable to read or parse artifacts/testcases.json: ${message}`));
     return [];
   }
 }
@@ -143,7 +123,7 @@ export function parseTestPointTraceability(content: string): ParsedTestPoint[] {
 
 function validateCaseSchema(cases: TestCase[], issues: ValidationIssue[]): void {
   for (const [index, testCase] of cases.entries()) {
-    const caseId = caseLabel(testCase, index);
+    const caseId = caseLabel(index);
 
     requireString(testCase.title, "title", caseId, issues);
     requireString(testCase.module, "module", caseId, issues);
@@ -152,57 +132,12 @@ function validateCaseSchema(cases: TestCase[], issues: ValidationIssue[]): void 
     requireString(testCase.preconditions, "preconditions", caseId, issues);
     requireString(testCase.expectedResult, "expectedResult", caseId, issues);
     requireNonEmptyArray(testCase.steps, "steps", caseId, issues);
-    warnVerboseFields(testCase, caseId, issues);
   }
 }
 
-function validateTraceability(
-  cases: TestCase[],
-  testpoints: ParsedTestPoint[],
-  issues: ValidationIssue[]
-): void {
-  if (testpoints.length === 0) {
-    return;
-  }
-
-  const knownTestPointIds = new Set(testpoints.map((point) => point.id));
-  const knownRequirementIds = new Set(testpoints.flatMap((point) => point.requirementIds));
-
+function validateQuality(cases: TestCase[], issues: ValidationIssue[]): void {
   for (const [index, testCase] of cases.entries()) {
-    const caseId = caseLabel(testCase, index);
-    for (const testPointId of testCase.testPointIds ?? []) {
-      if (!knownTestPointIds.has(testPointId)) {
-        issues.push(
-          error(
-            "UNKNOWN_TEST_POINT",
-            `Referenced test point ${testPointId} does not exist in specs/testpoints.md.`,
-            caseId
-          )
-        );
-      }
-    }
-
-    for (const requirementId of testCase.requirementIds ?? []) {
-      if (knownRequirementIds.size > 0 && !knownRequirementIds.has(requirementId)) {
-        issues.push(
-          warning(
-            "UNKNOWN_REQUIREMENT",
-            `Requirement ${requirementId} not found in test points.`,
-            caseId
-          )
-        );
-      }
-    }
-  }
-}
-
-function validateQuality(
-  cases: TestCase[],
-  testpoints: ParsedTestPoint[],
-  issues: ValidationIssue[]
-): void {
-  for (const [index, testCase] of cases.entries()) {
-    const caseId = caseLabel(testCase, index);
+    const caseId = caseLabel(index);
     if (isGenericStepSet(testCase.steps ?? [])) {
       issues.push(
         warning(
@@ -226,25 +161,6 @@ function validateQuality(
     }
   }
 
-  const knownRequirementIds = new Set(testpoints.flatMap((point) => point.requirementIds));
-  const allCasesCarryRequirementIds = cases.every((testCase) =>
-    Array.isArray(testCase.requirementIds)
-  );
-  if (allCasesCarryRequirementIds && knownRequirementIds.size > 1 && cases.length > 1) {
-    const allReq001 = cases.every(
-      (testCase) =>
-        (testCase.requirementIds ?? []).length === 1 && testCase.requirementIds?.[0] === "REQ-001"
-    );
-    if (allReq001) {
-      issues.push(
-        warning(
-          "SUSPICIOUS_REQ001_ONLY",
-          "Traceability-rich cases all link only to REQ-001 even though multiple requirements appear in test points."
-        )
-      );
-    }
-  }
-
   const normalizedSteps = cases.map((testCase) => normalizeSteps(testCase.steps ?? []));
   const duplicateCount = normalizedSteps.filter(
     (steps, index) => steps.length > 0 && normalizedSteps.indexOf(steps) !== index
@@ -257,28 +173,6 @@ function validateQuality(
       )
     );
   }
-}
-
-function warnVerboseFields(testCase: TestCase, caseId: string, issues: ValidationIssue[]): void {
-  for (const field of VERBOSE_COMPACT_FIELDS) {
-    const value = testCase[field];
-    if (isPresent(value)) {
-      issues.push(
-        warning(
-          "VERBOSE_COMPACT_FIELD",
-          `Field '${field}' is outside the compact default generation contract; omit it unless traceability or execution context explicitly requires it.`,
-          caseId
-        )
-      );
-    }
-  }
-}
-
-function isPresent(value: unknown): boolean {
-  if (Array.isArray(value)) {
-    return value.length > 0;
-  }
-  return value !== undefined && value !== null && value !== "";
 }
 
 function requireString(
@@ -332,12 +226,8 @@ function splitIssues(issues: ValidationIssue[]): ValidationResult {
   };
 }
 
-function stringValue(value: unknown): string {
-  return typeof value === "string" ? value : "";
-}
-
-function caseLabel(testCase: TestCase, index: number): string {
-  return stringValue(testCase.caseId) || `case[${index}]`;
+function caseLabel(index: number): string {
+  return `case[${index}]`;
 }
 
 function error(code: string, message: string, caseId?: string): ValidationIssue {

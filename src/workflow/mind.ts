@@ -22,7 +22,7 @@ function contentXml(title: string, cases: TestCase[]): string {
           const caseTopics = items
             .map((testCase, index) => {
               const compactId = `M${moduleIndex + 1}-${String(index + 1).padStart(2, "0")}`;
-              const caseTitle = `${testCase.caseId ?? compactId} ${testCase.title}`;
+              const caseTitle = `${compactId} ${testCase.title}`;
               return `<topic><title>${escapeXml(caseTitle)}</title><children><topics type="attached"><topic><title>${escapeXml(
                 `优先级：${testCase.priority}`
               )}</title></topic><topic><title>${escapeXml(

@@ -3,6 +3,8 @@ import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import type { PerformanceCase } from "./performance.js";
 import type { TestCase } from "./testcases.js";
 
+type WorkbookTestCase = TestCase & { executionResult?: string };
+
 export const FUNCTIONAL_EXCEL_HEADERS = [
   "功能模块",
   "用例名称",
@@ -48,9 +50,9 @@ interface WorksheetDescriptor {
   rows: string[][];
 }
 
-export async function writeExcelWorkbook(
+export async function writeExcelWorkbook<TCase extends WorkbookTestCase>(
   path: string,
-  cases: TestCase[],
+  cases: TCase[],
   performanceCases: PerformanceCase[] = []
 ): Promise<void> {
   const worksheets: WorksheetDescriptor[] = [
@@ -130,7 +132,7 @@ export async function readExecutionRows(path: string): Promise<ExecutionRow[]> {
   }));
 }
 
-function functionalRows(cases: TestCase[]): string[][] {
+function functionalRows(cases: WorkbookTestCase[]): string[][] {
   return [
     [...FUNCTIONAL_EXCEL_HEADERS],
     ...cases.map((testCase) => [

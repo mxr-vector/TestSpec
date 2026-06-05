@@ -18,6 +18,7 @@ export const WORKFLOW_COMMANDS = [
     slashCommand: "/test:new",
     backingCommand: "testspec new <name> --requirement <path>",
     description: "Create a test proposal workspace from a requirement document.",
+    argumentHint: "<name> --requirement <path>",
   },
   {
     id: "analysis",
@@ -25,6 +26,7 @@ export const WORKFLOW_COMMANDS = [
     slashCommand: "/test:analysis",
     backingCommand: "testspec analysis [name]",
     description: "Decompose requirements into testable items, risks, and questions.",
+    argumentHint: "[name]",
   },
   {
     id: "points",
@@ -32,6 +34,7 @@ export const WORKFLOW_COMMANDS = [
     slashCommand: "/test:points",
     backingCommand: "testspec points [name]",
     description: "Generate core scenario test points for a test change.",
+    argumentHint: "[name]",
   },
   {
     id: "validate",
@@ -39,6 +42,7 @@ export const WORKFLOW_COMMANDS = [
     slashCommand: "/test:validate",
     backingCommand: "testspec validate [name]",
     description: "Validate generated workflow artifacts.",
+    argumentHint: "[name]",
   },
   {
     id: "excel",
@@ -46,6 +50,7 @@ export const WORKFLOW_COMMANDS = [
     slashCommand: "/test:excel",
     backingCommand: "testspec excel [name]",
     description: "Export executable Excel test cases.",
+    argumentHint: "[name]",
   },
   {
     id: "mind",
@@ -53,6 +58,7 @@ export const WORKFLOW_COMMANDS = [
     slashCommand: "/test:mind",
     backingCommand: "testspec mind [name]",
     description: "Export mind-map style test cases for review.",
+    argumentHint: "[name]",
   },
   {
     id: "report",
@@ -60,6 +66,7 @@ export const WORKFLOW_COMMANDS = [
     slashCommand: "/test:report",
     backingCommand: "testspec report [name]",
     description: "Generate execution statistics from Excel results.",
+    argumentHint: "[name]",
   },
   {
     id: "archive",
@@ -67,6 +74,7 @@ export const WORKFLOW_COMMANDS = [
     slashCommand: "/test:archive",
     backingCommand: "testspec archive [name]",
     description: "Archive the full test artifact chain for traceability.",
+    argumentHint: "[name]",
   },
 ] as const;
 
@@ -77,7 +85,7 @@ export const PROVIDER_NEUTRAL_PROMPT_RULES = [
   "The coding agent performs semantic generation; the TestSpec CLI remains provider-free and deterministic.",
   "Always read `proposal.md` and the referenced requirement document before generating semantic artifacts.",
   "If the requirement document is missing, unreadable, remote, or ambiguous, stop and ask the user for readable content or explicit authorization; do not guess.",
-  "Keep traceability in requirement analysis and test-point artifacts when available; compact test cases do not need to duplicate per-case test point IDs or source evidence by default.",
+  "Keep traceability in requirement analysis and test-point artifacts; compact test cases use only the executable schema: `title`, `module`, `type`, `priority`, `preconditions`, `steps`, `expectedResult`.",
   "Use `待确认` or clarification questions for unspecified behavior instead of fabricating business rules, roles, state transitions, limits, or SLA values.",
   "Generate concrete executable steps and observable expected results; avoid generic template wording such as 'execute operation' or '符合需求'.",
   "Run `testspec validate [name]` before export workflows and fix blocking validation errors before producing Excel or mind-map artifacts.",
@@ -466,8 +474,7 @@ function renderCommandFile(command: WorkflowCommand): string {
     "---",
     `name: TestSpec ${titleCase(command.id)}`,
     `description: ${command.description}`,
-    "category: TestSpec",
-    "tags: [testspec, workflow, test]",
+    `argument-hint: ${command.argumentHint}`,
     "---",
     "",
     GENERATED_FILE_MARKER,
@@ -475,6 +482,8 @@ function renderCommandFile(command: WorkflowCommand): string {
     `# ${command.slashCommand}`,
     "",
     `Treat \`${command.slashCommand}\` as the Agent workflow label \`${command.label}\` for TestSpec.`,
+    "",
+    "User arguments: $ARGUMENTS",
     "",
     ...agentWorkflowInstructions(command),
     "",
@@ -517,18 +526,17 @@ function agentWorkflowInstructions(command: WorkflowCommand): string[] {
       "Agent workflow:",
       "",
       "1. Read `proposal.md`, `requirements-analysis.md`, `specs/testpoints.md`, and available requirement evidence.",
-      "2. Generate or update `artifacts/testcases.json` as compact executable cases. Default fields only: `title`, `module`, `type`, `priority`, `preconditions`, `steps`, and `expectedResult`.",
-      "3. Do not generate verbose/runtime fields by default: `caseId`, `testPointIds`, `riskIds`, `sourceRefs`, `testData`, `executionResult`, `actualResult`, `defectId`, or `notes`.",
-      "4. If concrete data is required for executability, embed it directly in the relevant precondition or step instead of creating a separate `testData` field.",
-      "5. Generate concrete executable steps and observable expected results grounded in requirement evidence; keep each case concise and execution-oriented.",
-      "6. Run `testspec validate [name]` and fix blocking errors before export. Treat compact-field warnings as instructions to remove unnecessary fields unless the user explicitly requested traceability-rich output.",
-      "7. Run the backing CLI export command:",
+      "2. Generate or update `artifacts/testcases.json` as compact executable cases using exactly this schema: `title`, `module`, `type`, `priority`, `preconditions`, `steps`, `expectedResult`.",
+      "3. Put concrete execution data directly in the relevant precondition or step.",
+      "4. Generate concrete executable steps and observable expected results grounded in requirement evidence; keep each case concise and execution-oriented.",
+      "5. Run `testspec validate [name]` and fix blocking errors before export.",
+      "6. Run the backing CLI export command:",
       "",
       "```bash",
       command.backingCommand,
       "```",
       "",
-      "8. Report validation status and the exported workbook path.",
+      "7. Report validation status and the exported workbook path.",
     ];
   }
 
@@ -592,7 +600,7 @@ function renderAgentsSection(selectedAgents: readonly AgentId[]): string {
     "1. `test:new` creates `testspec/changes/<name>/proposal.md`.",
     "2. `test:analysis` creates grounded `requirements-analysis.md` from requirement evidence.",
     "3. `test:points` creates traceable `specs/testpoints.md`.",
-    "4. `test:excel` creates compact executable `artifacts/testcases.json` using only default case fields (`title`, `module`, `type`, `priority`, `preconditions`, `steps`, `expectedResult`), runs `testspec validate`, and exports compact `artifacts/<name>_cases.xlsx`.",
+    "4. `test:excel` creates compact executable `artifacts/testcases.json` using exactly the schema `title`, `module`, `type`, `priority`, `preconditions`, `steps`, `expectedResult`; runs `testspec validate`; and exports compact `artifacts/<name>_cases.xlsx`.",
     "5. `test:validate` can be run independently to check compact schema and quality.",
     "6. `test:mind` creates `artifacts/<name>_cases.xmind` from the same structured cases.",
     "7. `test:report` creates `report.md` after Excel execution results are filled.",

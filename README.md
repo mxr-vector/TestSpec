@@ -127,7 +127,7 @@ When a command accepts `[name]`, TestSpec uses the explicit name if provided. If
 | `功能测试` | Minimal functional test cases with steps, expected results, priority, and execution status |
 | `性能测试` | Compact performance scenarios with baseline targets, metrics, and execution status        |
 
-The Excel workbook is execution-oriented. Low-value columns such as case IDs, test point IDs, test data, actual results, defect IDs, notes, and source evidence are omitted by default. Compact `artifacts/testcases.json` generation focuses on executable fields (`title`, `module`, `type`, `priority`, `preconditions`, `steps`, `expectedResult`) and avoids duplicating per-case traceability unless a traceability-rich workflow is explicitly requested.
+The Excel workbook is execution-oriented. Compact `artifacts/testcases.json` uses exactly the executable schema `title`, `module`, `type`, `priority`, `preconditions`, `steps`, and `expectedResult`; the CLI normalizes generated cases to that schema before validation and export.
 
 The performance worksheet is generated from deterministic rules:
 
@@ -194,7 +194,7 @@ The `test:*` labels are Agent workflow labels, not shell commands.
 
 - The agent must read `proposal.md` and the referenced requirement document before semantic generation.
 - If a requirement file is missing, remote, unreadable, or ambiguous, the agent must ask for readable content or explicit authorization instead of guessing.
-- Generated requirements, test points, and cases should cite source evidence with document, section, and short quote when available.
+- Generated requirements and test points should cite source evidence with document, section, and short quote when available; compact cases should stay executable and use the documented compact schema.
 - Unknown business rules, roles, state transitions, limits, and SLA values should be marked `待确认` or added as clarification questions.
 - Run `testspec validate [name]` before export and fix blocking validation errors.
 

@@ -127,7 +127,7 @@ testspec archive login-v2
 | `功能测试` | 最小化功能测试用例，包含步骤、预期结果、优先级和执行状态 |
 | `性能测试` | 精简性能场景，包含基线目标、指标和执行状态       |
 
-Excel 工作簿面向执行场景。用例编号、测试点 ID、测试数据、实际结果、缺陷编号、备注和来源证据等低价值列默认不导出。紧凑版 `artifacts/testcases.json` 默认聚焦可执行字段（`title`、`module`、`type`、`priority`、`preconditions`、`steps`、`expectedResult`），除非明确需要富追溯模式，否则不在每条用例重复追溯信息。
+Excel 工作簿面向执行场景。紧凑版 `artifacts/testcases.json` 使用精确的可执行字段结构：`title`、`module`、`type`、`priority`、`preconditions`、`steps`、`expectedResult`；CLI 会在校验和导出前将生成的用例归一化为该结构。
 
 性能工作表基于确定性规则生成：
 
@@ -194,7 +194,7 @@ your-project/
 
 - 代理必须先读取 `proposal.md` 和关联需求文档，再进行语义生成。
 - 如果需求文件缺失、远程不可读、无法解析或存在歧义，代理必须向用户索要可读内容或明确授权，不能猜测生成。
-- 生成的需求、测试点和用例应尽量包含来源证据：文档、章节和短摘录。
+- 生成的需求和测试点应尽量包含来源证据：文档、章节和短摘录；紧凑用例应保持可执行并使用文档中的紧凑字段结构。
 - 需求未说明的业务规则、角色、状态流转、限制和 SLA 应标记为 `待确认` 或写入待澄清问题。
 - 导出前运行 `testspec validate [name]`，并修复阻塞性校验错误。
 

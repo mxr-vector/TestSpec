@@ -2,31 +2,24 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ChangeWorkspace } from "./workspace.js";
 
-/** @legacy Kept for backward-compatible reading of traceability-rich artifacts. */
-export interface SourceRef {
-  document: string;
-  section?: string;
-  quote?: string;
-}
+export const COMPACT_TEST_CASE_FIELDS = [
+  "title",
+  "module",
+  "type",
+  "priority",
+  "preconditions",
+  "steps",
+  "expectedResult",
+] as const;
 
 export interface TestCase {
   title: string;
   module: string;
   type: string;
-  priority: "P0" | "P1" | "P2";
+  priority: string;
   preconditions: string;
   steps: string[];
   expectedResult: string;
-  caseId?: string;
-  requirementIds?: string[];
-  testPointIds?: string[];
-  riskIds?: string[];
-  sourceRefs?: SourceRef[];
-  testData?: string;
-  executionResult?: string;
-  actualResult?: string;
-  defectId?: string;
-  notes?: string;
 }
 
 interface TestPoint {
@@ -47,22 +40,66 @@ export async function generateStructuredCases(workspace: ChangeWorkspace): Promi
   return cases;
 }
 
-export async function readOrGenerateStructuredCases(
+export async function readCompactStructuredCases(workspace: ChangeWorkspace): Promise<TestCase[]> {
+  return compactParsedCases(await readStructuredCaseArray(workspace));
+}
+
+export async function normalizeAndPersistCompactCases(
   workspace: ChangeWorkspace
 ): Promise<TestCase[]> {
   const testcasesPath = join(workspace.artifactsDir, "testcases.json");
+  const parsed = await readStructuredCaseArray(workspace);
+  const cases = compactParsedCases(parsed);
 
+  if (!hasExactCompactCaseArrayShape(parsed)) {
+    await writeFile(testcasesPath, `${JSON.stringify(cases, null, 2)}\n`);
+  }
+
+  return cases;
+}
+
+export async function readOrGenerateStructuredCases(
+  workspace: ChangeWorkspace
+): Promise<TestCase[]> {
   try {
-    const content = await readFile(testcasesPath, "utf8");
-    const parsed = JSON.parse(content) as TestCase[];
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+    const cases = await normalizeAndPersistCompactCases(workspace);
+    if (cases.length > 0) {
+      return cases;
     }
   } catch {
     // Regenerate below when the file is missing or invalid.
   }
 
   return generateStructuredCases(workspace);
+}
+
+async function readStructuredCaseArray(workspace: ChangeWorkspace): Promise<unknown[]> {
+  const testcasesPath = join(workspace.artifactsDir, "testcases.json");
+  const parsed = JSON.parse(await readFile(testcasesPath, "utf8")) as unknown;
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("artifacts/testcases.json must be a JSON array.");
+  }
+
+  return parsed;
+}
+
+function compactParsedCases(values: unknown[]): TestCase[] {
+  return values.map(compactTestCase);
+}
+
+export function compactTestCase(value: unknown): TestCase {
+  const record = isRecord(value) ? value : {};
+
+  return {
+    title: stringValue(record.title),
+    module: stringValue(record.module),
+    type: stringValue(record.type),
+    priority: stringValue(record.priority),
+    preconditions: stringValue(record.preconditions),
+    steps: stringArray(record.steps),
+    expectedResult: stringValue(record.expectedResult),
+  };
 }
 
 export function parseTestPoints(content: string): TestPoint[] {
@@ -105,6 +142,37 @@ function createCaseFromPoint(point: TestPoint, index: number): TestCase {
     ],
     expectedResult: "结果可观察且符合需求约束。",
   };
+}
+
+function hasExactCompactCaseArrayShape(values: unknown[]): boolean {
+  return values.every(hasExactCompactCaseShape);
+}
+
+function hasExactCompactCaseShape(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const keys = Object.keys(value);
+  return (
+    keys.length === COMPACT_TEST_CASE_FIELDS.length &&
+    COMPACT_TEST_CASE_FIELDS.every((field) => Object.hasOwn(value, field))
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.map(stringValue);
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }
 
 function inferType(section: string): string {
