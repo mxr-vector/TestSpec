@@ -83,9 +83,7 @@ export async function resolveChangeWorkspace(
   const activeChanges = await listActiveChanges(cwd);
 
   if (activeChanges.length === 0) {
-    throw new TestSpecError(
-      "No active test changes found. Create one with `testspec new <name>`."
-    );
+    throw new TestSpecError("No active test changes found. Create one with `testspec new <name>`.");
   }
 
   if (activeChanges.length > 1) {
@@ -96,9 +94,7 @@ export async function resolveChangeWorkspace(
 
   const inferredName = activeChanges[0];
   if (!inferredName) {
-    throw new TestSpecError(
-      "No active test changes found. Create one with `testspec new <name>`."
-    );
+    throw new TestSpecError("No active test changes found. Create one with `testspec new <name>`.");
   }
 
   return buildChangeWorkspace(inferredName, cwd);

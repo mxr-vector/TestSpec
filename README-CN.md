@@ -65,12 +65,25 @@ testspec new login-v2 --requirement docs/login-prd.md
 
 ### 3. 执行工作流
 
+要获得贴合需求的语义生成效果，请在 Claude Code、Codex、Qoder 或其他已配置的编码代理中运行 `test:*` 标签。代理负责读取需求文档并生成语义产物；CLI 保持无模型供应商依赖，只负责校验、导出、报告和归档。
+
+```text
+/test:analysis login-v2
+/test:points login-v2
+/test:excel login-v2
+```
+
+`testspec analysis` 和 `testspec points` 等 CLI 命令仍可作为无代理场景下的确定性 fallback/template 辅助。
+
 ```bash
-# 需求分析
+# fallback/template 需求分析
 testspec analysis login-v2
 
-# 生成测试点
+# fallback/template 测试点
 testspec points login-v2
+
+# 导出前校验生成产物
+testspec validate login-v2
 
 # 导出测试用例到 Excel
 testspec excel login-v2
@@ -92,7 +105,8 @@ testspec archive login-v2
 | `testspec init`                            | —               | —                | 初始化项目并配置 AI 代理集成           |
 | `testspec new <name> --requirement <path>` | `test:new`      | `/test:new`      | 从需求文档创建测试提案工作区           |
 | `testspec analysis [name]`                 | `test:analysis` | `/test:analysis` | 将需求分解为可测试项、风险和待确认问题 |
-| `testspec points [name]`                   | `test:points`   | `/test:points`   | 为测试变更生成核心场景测试点           |
+| `testspec points [name]`                   | `test:points`   | `/test:points`   | 为测试变更生成 fallback/template 测试点 |
+| `testspec validate [name]`                 | `test:validate` | `/test:validate` | 校验生成产物的 schema、可追溯性和质量  |
 | `testspec excel [name]`                    | `test:excel`    | `/test:excel`    | 导出可执行的 Excel 测试用例            |
 | `testspec mind [name]`                     | `test:mind`     | `/test:mind`     | 导出用于评审的思维导图样式测试用例     |
 | `testspec report [name]`                   | `test:report`   | `/test:report`   | 从 Excel 执行结果生成执行统计信息      |
@@ -161,6 +175,7 @@ your-project/
 /test:new login-v2 --requirement docs/login-prd.md
 /test:analysis login-v2
 /test:points login-v2
+/test:validate login-v2
 /test:excel login-v2
 /test:mind login-v2
 /test:report login-v2
@@ -168,9 +183,35 @@ your-project/
 ```
 
 **Codex / 通用代理:**
-读取 `AGENTS.md` 并将 `test:*` 标签映射到 `testspec` CLI 命令。
+读取 `AGENTS.md` 中同一套与供应商无关的 prompt-pack 规则。`test:analysis`、`test:points`、`test:excel` 等语义标签应先读取需求证据并生成产物，再运行确定性的 CLI 校验/导出命令。
 
 `test:*` 标签是代理工作流标签，不是 shell 命令。
+
+### 需求贴合生成规则
+
+- 代理必须先读取 `proposal.md` 和关联需求文档，再进行语义生成。
+- 如果需求文件缺失、远程不可读、无法解析或存在歧义，代理必须向用户索要可读内容或明确授权，不能猜测生成。
+- 生成的需求、测试点和用例应尽量包含来源证据：文档、章节和短摘录。
+- 需求未说明的业务规则、角色、状态流转、限制和 SLA 应标记为 `待确认` 或写入待澄清问题。
+- 导出前运行 `testspec validate [name]`，并修复阻塞性校验错误。
+
+好的测试步骤应具体、可执行、可观察：
+
+```text
+1. 使用 user-a 登录。
+2. 打开登录页面。
+3. 输入 username=user-a 和 password=ValidPass123。
+4. 点击登录。
+5. 验证首页展示 user-a 的登录态。
+```
+
+避免泛化模板步骤：
+
+```text
+1. 准备测试数据。
+2. 执行业务操作。
+3. 验证系统符合需求。
+```
 
 ## 开发
 

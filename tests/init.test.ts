@@ -52,9 +52,7 @@ describe("registerInitCommand", () => {
 
     await program.parseAsync(["init", "--agents", "claude"], { from: "user" });
 
-    expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Initialized TestSpec workspace.")
-    );
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Initialized TestSpec workspace."));
     await expect(stat(join(tempDir, "testspec", "changes", "archive"))).resolves.toMatchObject({});
   });
 });
@@ -94,7 +92,28 @@ describe("initializeTestSpec", () => {
       expect(content).toContain(command.slashCommand);
       expect(content).toContain(command.label);
       expect(content).toContain(command.backingCommand);
+      expect(content).toContain("Provider-neutral generation rules");
     }
+  });
+
+  it("generates semantic workflow prompts for agent-grounded commands", async () => {
+    await initializeTestSpec({ agents: "claude" });
+
+    const analysis = await readFile(
+      join(tempDir, ".claude", "commands", "test", "analysis.md"),
+      "utf8"
+    );
+    const points = await readFile(
+      join(tempDir, ".claude", "commands", "test", "points.md"),
+      "utf8"
+    );
+    const excel = await readFile(join(tempDir, ".claude", "commands", "test", "excel.md"), "utf8");
+
+    expect(analysis).toContain("Read the local requirement document");
+    expect(analysis).toContain("Generate `requirements-analysis.md` with requirement IDs");
+    expect(points).toContain("Generate `specs/testpoints.md` with stable `TP-xxx` IDs");
+    expect(excel).toContain("Generate or update `artifacts/testcases.json`");
+    expect(excel).toContain("Run `testspec validate [name]`");
   });
 
   it("generates all Qoder workflow command files", async () => {
@@ -123,6 +142,8 @@ describe("initializeTestSpec", () => {
     expect(content).toContain("BEGIN TESTSPEC AGENT WORKFLOW");
     expect(content).toContain("test:new");
     expect(content).toContain("testspec new <name> --requirement <path>");
+    expect(content).toContain("agent-executed generation and CLI-managed validation/export");
+    expect(content).toContain("testspec validate [name]");
   });
 
   it("creates AGENTS.md for generic agent guidance", async () => {

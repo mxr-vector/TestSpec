@@ -65,12 +65,25 @@ This creates a new test change directory with a proposal template.
 
 ### 3. Run the Workflow
 
+For requirement-grounded generation, run the `test:*` labels inside Claude Code, Codex, Qoder, or another configured coding agent. The agent reads the requirement document and writes semantic artifacts; the CLI remains provider-free and handles validation, export, reporting, and archive.
+
+```text
+/test:analysis login-v2
+/test:points login-v2
+/test:excel login-v2
+```
+
+CLI commands such as `testspec analysis` and `testspec points` remain deterministic fallback/template helpers when no agent is available.
+
 ```bash
-# Analyze requirements
+# Fallback/template requirement analysis
 testspec analysis login-v2
 
-# Generate test points
+# Fallback/template test points
 testspec points login-v2
+
+# Validate generated artifacts before export
+testspec validate login-v2
 
 # Export test cases to Excel
 testspec excel login-v2
@@ -92,7 +105,8 @@ testspec archive login-v2
 | `testspec init`                            | —               | —                | Initialize project with AI agent integrations                    |
 | `testspec new <name> --requirement <path>` | `test:new`      | `/test:new`      | Create a test proposal workspace from a requirement document     |
 | `testspec analysis [name]`                 | `test:analysis` | `/test:analysis` | Decompose requirements into testable items, risks, and questions |
-| `testspec points [name]`                   | `test:points`   | `/test:points`   | Generate core scenario test points for a test change             |
+| `testspec points [name]`                   | `test:points`   | `/test:points`   | Generate fallback/template test points for a test change         |
+| `testspec validate [name]`                 | `test:validate` | `/test:validate` | Validate generated artifacts for schema, traceability, and quality |
 | `testspec excel [name]`                    | `test:excel`    | `/test:excel`    | Export executable Excel test cases                               |
 | `testspec mind [name]`                     | `test:mind`     | `/test:mind`     | Export mind-map style test cases for review                      |
 | `testspec report [name]`                   | `test:report`   | `/test:report`   | Generate execution statistics from Excel results                 |
@@ -161,6 +175,7 @@ After `testspec init`, AI agents can use workflow labels directly:
 /test:new login-v2 --requirement docs/login-prd.md
 /test:analysis login-v2
 /test:points login-v2
+/test:validate login-v2
 /test:excel login-v2
 /test:mind login-v2
 /test:report login-v2
@@ -168,9 +183,35 @@ After `testspec init`, AI agents can use workflow labels directly:
 ```
 
 **Codex / Generic Agents:**
-Reads `AGENTS.md` and maps `test:*` labels to `testspec` CLI commands.
+Read `AGENTS.md` for the same provider-neutral prompt-pack rules. Semantic labels such as `test:analysis`, `test:points`, and `test:excel` should read requirement evidence and generate artifacts before running deterministic CLI validation/export commands.
 
 The `test:*` labels are Agent workflow labels, not shell commands.
+
+### Requirement-grounded generation rules
+
+- The agent must read `proposal.md` and the referenced requirement document before semantic generation.
+- If a requirement file is missing, remote, unreadable, or ambiguous, the agent must ask for readable content or explicit authorization instead of guessing.
+- Generated requirements, test points, and cases should cite source evidence with document, section, and short quote when available.
+- Unknown business rules, roles, state transitions, limits, and SLA values should be marked `待确认` or added as clarification questions.
+- Run `testspec validate [name]` before export and fix blocking validation errors.
+
+Good case steps are concrete and observable:
+
+```text
+1. Log in as user-a.
+2. Open the login page.
+3. Enter username=user-a and password=ValidPass123.
+4. Click Login.
+5. Verify the home page shows user-a as logged in.
+```
+
+Avoid generic template steps:
+
+```text
+1. Prepare test data.
+2. Execute the operation.
+3. Verify the system meets requirements.
+```
 
 ## Development
 

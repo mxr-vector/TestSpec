@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { Command } from "commander";
 import { TestSpecError } from "../core/errors.js";
-import { logSuccess } from "../core/logger.js";
+import { logInfo, logSuccess } from "../core/logger.js";
 import { archiveChange } from "../workflow/archive.js";
 import {
   writeProposal,
@@ -13,10 +13,11 @@ import { readOrGeneratePerformanceCases } from "../workflow/performance.js";
 import { writeReport } from "../workflow/report.js";
 import { writeExcelWorkbook } from "../workflow/spreadsheet.js";
 import { readOrGenerateStructuredCases } from "../workflow/testcases.js";
+import { formatValidationResult, validateWorkflowArtifacts } from "../workflow/validation.js";
 import { createChangeWorkspace, resolveChangeWorkspace } from "../workflow/workspace.js";
 
 const WORKFLOW_DESCRIPTION =
-  "Workflow labels: test:new, test:analysis, test:points, test:excel, test:mind, test:report, test:archive.";
+  "Workflow labels: test:new, test:analysis, test:points, test:validate, test:excel, test:mind, test:report, test:archive.";
 
 export function registerWorkflowCommands(program: Command): void {
   program.addHelpText("after", `\n${WORKFLOW_DESCRIPTION}\n`);
@@ -64,12 +65,35 @@ export function registerWorkflowCommands(program: Command): void {
     });
 
   program
+    .command("validate")
+    .description("Validate generated workflow artifacts (test:validate)")
+    .argument("[name]", "test change name")
+    .action(async (name?: string) => {
+      const workspace = await resolveChangeWorkspace(name);
+      const result = await validateWorkflowArtifacts(workspace);
+      logInfo(formatValidationResult(result));
+      if (result.errors.length > 0) {
+        throw new TestSpecError(
+          `Validation failed with ${result.errors.length} error(s) and ${result.warnings.length} warning(s).`
+        );
+      }
+      logSuccess(
+        `Validated workflow artifacts for ${workspace.name} with ${result.warnings.length} warning(s).`
+      );
+    });
+
+  program
     .command("excel")
     .description("Export executable Excel test cases (test:excel)")
     .argument("[name]", "test change name")
     .action(async (name?: string) => {
       const workspace = await resolveChangeWorkspace(name);
       const cases = await readOrGenerateStructuredCases(workspace);
+      const validation = await validateWorkflowArtifacts(workspace);
+      if (validation.errors.length > 0) {
+        logInfo(formatValidationResult(validation));
+        throw new TestSpecError("Cannot export Excel because workflow artifact validation failed.");
+      }
       const performanceCases = await readOrGeneratePerformanceCases(workspace);
       const outputPath = join(workspace.artifactsDir, `${workspace.name}_cases.xlsx`);
       await writeExcelWorkbook(outputPath, cases, performanceCases);
@@ -83,6 +107,13 @@ export function registerWorkflowCommands(program: Command): void {
     .action(async (name?: string) => {
       const workspace = await resolveChangeWorkspace(name);
       const cases = await readOrGenerateStructuredCases(workspace);
+      const validation = await validateWorkflowArtifacts(workspace);
+      if (validation.errors.length > 0) {
+        logInfo(formatValidationResult(validation));
+        throw new TestSpecError(
+          "Cannot export mind map because workflow artifact validation failed."
+        );
+      }
       const outputPath = join(workspace.artifactsDir, `${workspace.name}_cases.xmind`);
       await writeXmind(outputPath, `${workspace.name} 测试用例`, cases);
       logSuccess(`Exported mind-map test cases: ${outputPath}`);

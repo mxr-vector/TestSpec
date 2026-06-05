@@ -19,6 +19,7 @@ import {
   generateStructuredCases,
   readOrGenerateStructuredCases,
 } from "../src/workflow/testcases.js";
+import { formatValidationResult, validateWorkflowArtifacts } from "../src/workflow/validation.js";
 import { createChangeWorkspace } from "../src/workflow/workspace.js";
 
 let originalCwd: string;
@@ -162,7 +163,9 @@ describe("structured cases and exports", () => {
           requirementIds: ["REQ-001"],
           testPointIds: ["TP-001"],
           riskIds: [],
+          sourceRefs: [{ document: "docs/login.md", section: "登录", quote: "用户可以登录" }],
           preconditions: "已注册",
+          testData: "username=user-a",
           steps: ["登录"],
           expectedResult: "登录成功",
           executionResult: "未执行",
@@ -183,7 +186,7 @@ describe("structured cases and exports", () => {
     expect(workbook["xl/worksheets/sheet2.xml"]).toBeUndefined();
   });
 
-  it("refreshes structured cases when test points change", async () => {
+  it("preserves existing structured cases when test points change", async () => {
     const workspace = await createChangeWorkspace("login-v2");
     await writeTestPoints(workspace);
     await generateStructuredCases(workspace);
@@ -194,7 +197,246 @@ describe("structured cases and exports", () => {
 
     const cases = await readOrGenerateStructuredCases(workspace);
 
-    expect(cases[0]).toMatchObject({ title: "新成功路径。" });
+    expect(cases[0]).not.toMatchObject({ title: "新成功路径。" });
+    expect(cases[0]?.notes).toContain("CLI fallback/template case");
+  });
+});
+
+describe("validation", () => {
+  it("passes valid agent-generated cases and preserves them for exports", async () => {
+    const workspace = await createChangeWorkspace("agent-login");
+    await writeFile(
+      join(workspace.specsDir, "testpoints.md"),
+      [
+        "# 测试点清单：agent-login",
+        "",
+        "## 核心流程",
+        "",
+        "- [TP-001] 覆盖 REQ-001 用户密码登录 的主要成功路径。 来源：docs/login.md §2.1",
+      ].join("\n")
+    );
+    await writeFile(
+      join(workspace.artifactsDir, "testcases.json"),
+      `${JSON.stringify(
+        [
+          {
+            caseId: "TC-001",
+            title: "有效账号密码登录成功",
+            module: "登录",
+            type: "正向",
+            priority: "P0",
+            requirementIds: ["REQ-001"],
+            testPointIds: ["TP-001"],
+            riskIds: [],
+            sourceRefs: [
+              {
+                document: "docs/login.md",
+                section: "2.1 密码登录",
+                quote: "用户可以使用有效账号和密码登录系统。",
+              },
+            ],
+            preconditions: "用户 user-a 已注册且账号状态正常。",
+            testData: "username=user-a; password=ValidPass123",
+            steps: ["打开登录页", "输入 user-a 和 ValidPass123", "点击登录按钮"],
+            expectedResult: "系统跳转到首页并显示 user-a 的登录态。",
+            executionResult: "未执行",
+            notes: "source checked",
+          },
+        ],
+        null,
+        2
+      )}\n`
+    );
+
+    const validation = await validateWorkflowArtifacts(workspace);
+    const cases = await readOrGenerateStructuredCases(workspace);
+    const workbookPath = join(workspace.artifactsDir, "agent-login_cases.xlsx");
+    await writeExcelWorkbook(workbookPath, cases, []);
+    const workbook = unzipSync(await readFile(workbookPath));
+    const functionalSheetXml = strFromU8(workbookEntry(workbook, "xl/worksheets/sheet1.xml"));
+
+    expect(validation.errors).toHaveLength(0);
+    expect(formatValidationResult(validation)).toContain("Validation errors: 0");
+    expect(cases[0]?.title).toBe("有效账号密码登录成功");
+    expect(functionalSheetXml).toContain("username=user-a; password=ValidPass123");
+    expect(functionalSheetXml).toContain("source checked");
+  });
+
+  it("reports schema, traceability, and quality validation issues", async () => {
+    const workspace = await createChangeWorkspace("bad-cases");
+    await writeFile(
+      join(workspace.specsDir, "testpoints.md"),
+      [
+        "# 测试点清单：bad-cases",
+        "",
+        "## 核心流程",
+        "",
+        "- [TP-001] 覆盖 REQ-001 登录 的主要成功路径。",
+        "- [TP-002] 覆盖 REQ-002 注册 的主要成功路径。",
+      ].join("\n")
+    );
+    await writeFile(
+      join(workspace.artifactsDir, "testcases.json"),
+      `${JSON.stringify(
+        [
+          {
+            caseId: "TC-001",
+            title: "模板用例 1",
+            module: "登录",
+            type: "正向",
+            priority: "P0",
+            requirementIds: ["REQ-999"],
+            testPointIds: ["TP-999"],
+            riskIds: [],
+            preconditions: "已准备",
+            steps: ["准备测试数据", "执行对应业务操作", "观察系统响应和数据结果"],
+            expectedResult: "符合需求",
+          },
+          {
+            caseId: "TC-002",
+            title: "模板用例 2",
+            module: "注册",
+            type: "正向",
+            priority: "P1",
+            requirementIds: ["REQ-001"],
+            testPointIds: ["TP-001"],
+            riskIds: [],
+            preconditions: "已准备",
+            steps: ["准备测试数据", "执行对应业务操作", "观察系统响应和数据结果"],
+            expectedResult: "系统行为符合需求、测试点和风险覆盖预期。",
+          },
+        ],
+        null,
+        2
+      )}\n`
+    );
+
+    const validation = await validateWorkflowArtifacts(workspace);
+    const output = formatValidationResult(validation);
+
+    expect(validation.errors.some((issue) => issue.code === "MISSING_FIELD")).toBe(false);
+    expect(validation.errors.some((issue) => issue.code === "UNKNOWN_TEST_POINT")).toBe(true);
+    expect(validation.warnings.some((issue) => issue.code === "MISSING_SOURCE_REFS")).toBe(true);
+    expect(validation.warnings.some((issue) => issue.code === "UNKNOWN_REQUIREMENT")).toBe(true);
+    expect(validation.warnings.some((issue) => issue.code === "GENERIC_STEPS")).toBe(true);
+    expect(validation.warnings.some((issue) => issue.code === "VAGUE_EXPECTED_RESULT")).toBe(true);
+    expect(output).toContain("Validation errors:");
+    expect(output).toContain("Validation warnings:");
+  });
+
+  it("warns when all cases link only to REQ-001 despite multiple requirements", async () => {
+    const workspace = await createChangeWorkspace("req001-only");
+    await writeFile(
+      join(workspace.specsDir, "testpoints.md"),
+      [
+        "# 测试点清单：req001-only",
+        "",
+        "## 核心流程",
+        "",
+        "- [TP-001] 覆盖 REQ-001 登录 的主要成功路径。",
+        "- [TP-002] 覆盖 REQ-002 注册 的主要成功路径。",
+      ].join("\n")
+    );
+    await writeFile(
+      join(workspace.artifactsDir, "testcases.json"),
+      `${JSON.stringify(
+        ["001", "002"].map((id) => ({
+          caseId: `TC-${id}`,
+          title: `账号用例 ${id}`,
+          module: "账号",
+          type: "正向",
+          priority: "P1",
+          requirementIds: ["REQ-001"],
+          testPointIds: [`TP-${id}`],
+          riskIds: [],
+          sourceRefs: [{ document: "docs/account.md", section: `TP-${id}` }],
+          preconditions: "用户账号可用。",
+          steps: ["打开账号页面", "输入有效数据", `点击提交 ${id}`],
+          expectedResult: `完成账号场景 ${id} 并展示成功结果。`,
+        })),
+        null,
+        2
+      )}\n`
+    );
+
+    const validation = await validateWorkflowArtifacts(workspace);
+
+    expect(validation.errors).toHaveLength(0);
+    expect(validation.warnings.some((issue) => issue.code === "SUSPICIOUS_REQ001_ONLY")).toBe(true);
+  });
+
+  it("does not cascade unknown test point errors when testpoints are unreadable", async () => {
+    const workspace = await createChangeWorkspace("missing-testpoints");
+    await writeFile(
+      join(workspace.artifactsDir, "testcases.json"),
+      `${JSON.stringify(
+        [
+          {
+            caseId: "TC-001",
+            title: "有效账号密码登录成功",
+            module: "登录",
+            type: "正向",
+            priority: "P0",
+            requirementIds: ["REQ-001"],
+            testPointIds: ["TP-001"],
+            riskIds: [],
+            sourceRefs: [{ document: "docs/login.md" }],
+            preconditions: "用户已注册。",
+            steps: ["打开登录页", "输入有效账号密码", "点击登录"],
+            expectedResult: "系统跳转到首页并展示登录态。",
+          },
+        ],
+        null,
+        2
+      )}\n`
+    );
+
+    const validation = await validateWorkflowArtifacts(workspace);
+
+    expect(validation.errors.some((issue) => issue.code === "TESTPOINTS_UNREADABLE")).toBe(true);
+    expect(validation.errors.some((issue) => issue.code === "UNKNOWN_TEST_POINT")).toBe(false);
+  });
+
+  it("warns when many cases have near-identical steps", async () => {
+    const workspace = await createChangeWorkspace("duplicate-cases");
+    await writeFile(
+      join(workspace.specsDir, "testpoints.md"),
+      [
+        "# 测试点清单：duplicate-cases",
+        "",
+        "## 核心流程",
+        "",
+        "- [TP-001] 覆盖 REQ-001 登录 的主要成功路径。",
+        "- [TP-002] 覆盖 REQ-002 注册 的主要成功路径。",
+        "- [TP-003] 覆盖 REQ-003 退出 的主要成功路径。",
+      ].join("\n")
+    );
+    await writeFile(
+      join(workspace.artifactsDir, "testcases.json"),
+      `${JSON.stringify(
+        ["001", "002", "003"].map((id, index) => ({
+          caseId: `TC-${id}`,
+          title: `重复步骤用例 ${id}`,
+          module: "账号",
+          type: "正向",
+          priority: "P1",
+          requirementIds: [`REQ-${id}`],
+          testPointIds: [`TP-${id}`],
+          riskIds: [],
+          sourceRefs: [{ document: "docs/account.md", section: `REQ-${id}` }],
+          preconditions: "用户账号可用。",
+          steps: ["打开账号页面", "输入有效数据", "点击提交"],
+          expectedResult: `完成账号场景 ${index + 1} 并展示成功结果。`,
+        })),
+        null,
+        2
+      )}\n`
+    );
+
+    const validation = await validateWorkflowArtifacts(workspace);
+
+    expect(validation.errors).toHaveLength(0);
+    expect(validation.warnings.some((issue) => issue.code === "NEAR_DUPLICATE_CASES")).toBe(true);
   });
 });
 
@@ -254,7 +496,9 @@ describe("reporting", () => {
           requirementIds: ["REQ-001"],
           testPointIds: ["TP-001"],
           riskIds: [],
+          sourceRefs: [{ document: "docs/login.md", section: "登录", quote: "用户可以登录" }],
           preconditions: "已注册",
+          testData: "username=user-a",
           steps: ["登录"],
           expectedResult: "登录成功",
           executionResult: "通过",

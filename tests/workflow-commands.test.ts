@@ -26,6 +26,7 @@ describe("workflow command registration", () => {
     expect(names).toContain("new");
     expect(names).toContain("analysis");
     expect(names).toContain("points");
+    expect(names).toContain("validate");
     expect(names).toContain("excel");
     expect(names).toContain("mind");
     expect(names).toContain("report");
@@ -39,6 +40,7 @@ describe("workflow command registration", () => {
     expect(help).toContain("new");
     expect(help).toContain("analysis");
     expect(help).toContain("points");
+    expect(help).toContain("validate");
     expect(help).toContain("excel");
     expect(help).toContain("mind");
     expect(help).toContain("report");
@@ -88,5 +90,22 @@ describe("workflow command actions", () => {
     expect(analysis).toContain("用户可以使用密码登录");
     expect(points).toContain("覆盖 REQ-001 用户可以使用密码登录");
     expect(logSpy).toHaveBeenCalled();
+  });
+
+  it("validates generated workflow artifacts through the CLI", async () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const program = createProgram();
+
+    await program.parseAsync(["new", "login-v2", "--requirement", "docs/login.md"], {
+      from: "user",
+    });
+    await program.parseAsync(["points", "login-v2"], { from: "user" });
+    await program.parseAsync(["excel", "login-v2"], { from: "user" });
+    await program.parseAsync(["validate", "login-v2"], { from: "user" });
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Validation errors: 0"));
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Validated workflow artifacts for login-v2 with 1 warning(s)")
+    );
   });
 });

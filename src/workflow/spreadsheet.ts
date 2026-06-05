@@ -157,16 +157,24 @@ function functionalRows(cases: TestCase[]): string[][] {
       testCase.title,
       testCase.type,
       testCase.preconditions,
-      "",
+      testCase.testData ?? "",
       testCase.steps.map((step, index) => `${index + 1}. ${step}`).join("\n"),
       testCase.expectedResult,
       testCase.priority,
       testCase.executionResult ?? "未执行",
-      "",
-      "",
-      "",
+      testCase.actualResult ?? "",
+      testCase.defectId ?? "",
+      testCase.notes ?? formatSourceRefs(testCase.sourceRefs ?? []),
     ]),
   ];
+}
+
+function formatSourceRefs(sourceRefs: NonNullable<TestCase["sourceRefs"]>): string {
+  return sourceRefs
+    .map((sourceRef) =>
+      [sourceRef.document, sourceRef.section, sourceRef.quote].filter(Boolean).join(" | ")
+    )
+    .join("\n");
 }
 
 function performanceRows(cases: PerformanceCase[]): string[][] {

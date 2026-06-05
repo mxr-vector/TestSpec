@@ -12,6 +12,7 @@ describe("createProgram", () => {
     expect(commandNames).toContain("new");
     expect(commandNames).toContain("analysis");
     expect(commandNames).toContain("points");
+    expect(commandNames).toContain("validate");
     expect(commandNames).toContain("excel");
     expect(commandNames).toContain("mind");
     expect(commandNames).toContain("report");

@@ -34,6 +34,13 @@ export const WORKFLOW_COMMANDS = [
     description: "Generate core scenario test points for a test change.",
   },
   {
+    id: "validate",
+    label: "test:validate",
+    slashCommand: "/test:validate",
+    backingCommand: "testspec validate [name]",
+    description: "Validate generated workflow artifacts.",
+  },
+  {
     id: "excel",
     label: "test:excel",
     slashCommand: "/test:excel",
@@ -65,6 +72,16 @@ export const WORKFLOW_COMMANDS = [
 
 export type WorkflowCommand = (typeof WORKFLOW_COMMANDS)[number];
 export type AgentId = "claude" | "qoder" | "codex" | "generic";
+
+export const PROVIDER_NEUTRAL_PROMPT_RULES = [
+  "The coding agent performs semantic generation; the TestSpec CLI remains provider-free and deterministic.",
+  "Always read `proposal.md` and the referenced requirement document before generating semantic artifacts.",
+  "If the requirement document is missing, unreadable, remote, or ambiguous, stop and ask the user for readable content or explicit authorization; do not guess.",
+  "Every generated requirement, test point, and test case must trace to requirement IDs and source evidence when available.",
+  "Use `待确认` or clarification questions for unspecified behavior instead of fabricating business rules, roles, state transitions, limits, or SLA values.",
+  "Generate concrete executable steps and observable expected results; avoid generic template wording such as 'execute operation' or '符合需求'.",
+  "Run `testspec validate [name]` before export workflows and fix blocking validation errors before producing Excel or mind-map artifacts.",
+] as const;
 
 export interface AgentIntegration {
   id: AgentId;
@@ -406,6 +423,72 @@ function renderCommandFile(command: WorkflowCommand): string {
     "",
     `Treat \`${command.slashCommand}\` as the Agent workflow label \`${command.label}\` for TestSpec.`,
     "",
+    ...agentWorkflowInstructions(command),
+    "",
+    "Provider-neutral generation rules:",
+    "",
+    ...PROVIDER_NEUTRAL_PROMPT_RULES.map((rule) => `- ${rule}`),
+    "",
+  ].join("\n");
+}
+
+function agentWorkflowInstructions(command: WorkflowCommand): string[] {
+  if (command.id === "analysis") {
+    return [
+      "Agent workflow:",
+      "",
+      "1. Resolve the target change from the user's argument or the active `testspec/changes/<name>/` workspace.",
+      "2. Read `proposal.md` and the requirement reference under `## 关联需求文档`.",
+      "3. Read the local requirement document when available. If it cannot be read, ask the user for content or authorization before continuing.",
+      "4. Generate `requirements-analysis.md` with requirement IDs, source evidence, business rules, boundaries, dependencies, risks, assumptions, and clarification questions.",
+      `5. Deterministic fallback/template CLI command, if no semantic generation is possible: \`${command.backingCommand}\`.`,
+      "6. Report the generated artifact path and any clarification questions.",
+    ];
+  }
+
+  if (command.id === "points") {
+    return [
+      "Agent workflow:",
+      "",
+      "1. Read `proposal.md`, `requirements-analysis.md`, and available requirement evidence.",
+      "2. Generate `specs/testpoints.md` with stable `TP-xxx` IDs, linked `REQ-xxx` IDs, scenario type, priority/risk, and source evidence.",
+      "3. Cover positive, negative, boundary, exception, permission/security, state-flow, data-validation, and risk scenarios only where supported by the requirement evidence.",
+      "4. Mark unsupported or unclear behavior as `待确认` instead of inventing coverage.",
+      `5. Deterministic fallback/template CLI command, if no semantic generation is possible: \`${command.backingCommand}\`.`,
+      "6. Report the generated artifact path and coverage gaps.",
+    ];
+  }
+
+  if (command.id === "excel") {
+    return [
+      "Agent workflow:",
+      "",
+      "1. Read `proposal.md`, `requirements-analysis.md`, `specs/testpoints.md`, and available requirement evidence.",
+      "2. Generate or update `artifacts/testcases.json` with concrete test data, executable steps, observable expected results, requirement/test-point/risk traceability, and `sourceRefs`.",
+      "3. Run `testspec validate [name]` and fix blocking errors before export.",
+      "4. Run the backing CLI export command:",
+      "",
+      "```bash",
+      command.backingCommand,
+      "```",
+      "",
+      "5. Report validation status and the exported workbook path.",
+    ];
+  }
+
+  if (command.id === "validate") {
+    return [
+      "Run the backing CLI validation command with the user's arguments:",
+      "",
+      "```bash",
+      command.backingCommand,
+      "```",
+      "",
+      "Treat validation errors as blockers. Treat validation warnings as review items to discuss or fix.",
+    ];
+  }
+
+  return [
     "Run the backing CLI command with the user's arguments:",
     "",
     "```bash",
@@ -414,18 +497,18 @@ function renderCommandFile(command: WorkflowCommand): string {
     "",
     "Guidelines:",
     "",
-    "- Use the installed `testspec` CLI as the source of truth.",
+    "- Use the installed `testspec` CLI as the source of truth for deterministic workspace, export, report, and archive operations.",
     "- If required arguments are missing, ask the user before running the command.",
     "- Do not treat the `test:*` label as a shell command; it is an Agent workflow label.",
     "- Report the generated artifact paths after the command completes.",
-    "",
-  ].join("\n");
+  ];
 }
 
 function renderAgentsSection(selectedAgents: readonly AgentId[]): string {
   const agentNames = formatAgentNames(selectedAgents);
   const rows = WORKFLOW_COMMANDS.map(
-    (command) => `| \`${command.label}\` | \`${command.backingCommand}\` | ${command.description} |`
+    (command) =>
+      `| \`${command.label}\` | \`${command.backingCommand}\` | ${agentBehaviorSummary(command)} |`
   );
 
   return [
@@ -436,25 +519,48 @@ function renderAgentsSection(selectedAgents: readonly AgentId[]): string {
     "",
     `Configured integrations: ${agentNames}.`,
     "",
-    "When the user asks for a TestSpec workflow label, run the backing CLI command:",
+    "TestSpec uses agent-executed generation and CLI-managed validation/export. Claude Code, Codex, Qoder, or another coding agent should generate semantic artifacts from requirements; the `testspec` CLI remains provider-free and deterministic.",
     "",
-    "| Workflow label | Backing CLI command | Purpose |",
+    "Provider-neutral generation rules:",
+    "",
+    ...PROVIDER_NEUTRAL_PROMPT_RULES.map((rule) => `- ${rule}`),
+    "",
+    "Workflow labels and backing CLI commands:",
+    "",
+    "| Workflow label | Backing CLI command | Agent behavior |",
     "|---|---|---|",
     ...rows,
     "",
     "Recommended order:",
     "",
     "1. `test:new` creates `testspec/changes/<name>/proposal.md`.",
-    "2. `test:analysis` creates `requirements-analysis.md`.",
-    "3. `test:points` creates `specs/testpoints.md`.",
-    "4. `test:excel` creates `artifacts/<name>_cases.xlsx`.",
-    "5. `test:mind` creates `artifacts/<name>_cases.xmind`.",
-    "6. `test:report` creates `report.md` after Excel execution results are filled.",
-    "7. `test:archive` moves the change to `testspec/changes/archive/<date>-<name>/`.",
+    "2. `test:analysis` creates grounded `requirements-analysis.md` from requirement evidence.",
+    "3. `test:points` creates traceable `specs/testpoints.md`.",
+    "4. `test:excel` creates concrete `artifacts/testcases.json`, runs `testspec validate`, and exports `artifacts/<name>_cases.xlsx`.",
+    "5. `test:validate` can be run independently to check schema, traceability, and quality.",
+    "6. `test:mind` creates `artifacts/<name>_cases.xmind` from the same structured cases.",
+    "7. `test:report` creates `report.md` after Excel execution results are filled.",
+    "8. `test:archive` moves the change to `testspec/changes/archive/<date>-<name>/`.",
     "",
     "Important: `test:*` entries are Agent workflow labels, not shell commands. Use `testspec <subcommand>` in the terminal.",
     AGENTS_SECTION_END,
   ].join("\n");
+}
+
+function agentBehaviorSummary(command: WorkflowCommand): string {
+  if (command.id === "analysis") {
+    return "Agent reads the requirement source and writes grounded `requirements-analysis.md`.";
+  }
+  if (command.id === "points") {
+    return "Agent derives traceable `specs/testpoints.md` from analysis and source evidence.";
+  }
+  if (command.id === "excel") {
+    return "Agent writes concrete `artifacts/testcases.json`, validates it, then exports Excel.";
+  }
+  if (command.id === "validate") {
+    return "CLI validates schema, traceability, and quality of generated artifacts.";
+  }
+  return command.description;
 }
 
 function collectWriteResult(result: InitResult, writeResult: WriteResult): void {
