@@ -1,4 +1,4 @@
-<!-- BEGIN TESTPILOT AGENT WORKFLOW -->
+<!-- BEGIN TESTSPEC AGENT WORKFLOW -->
 
 # TestSpec Agent Workflow
 
@@ -30,4 +30,4 @@ Recommended order:
 
 Important: `test:*` entries are Agent workflow labels, not shell commands. Use `testspec <subcommand>` in the terminal.
 
-<!-- END TESTPILOT AGENT WORKFLOW -->
+<!-- END TESTSPEC AGENT WORKFLOW -->

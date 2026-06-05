@@ -120,7 +120,7 @@ describe("initializeTestSpec", () => {
 
     expect(content).toContain("# Existing Guidance");
     expect(content).toContain("Keep this.");
-    expect(content).toContain("BEGIN TESTPILOT AGENT WORKFLOW");
+    expect(content).toContain("BEGIN TESTSPEC AGENT WORKFLOW");
     expect(content).toContain("test:new");
     expect(content).toContain("testspec new <name> --requirement <path>");
   });
@@ -130,7 +130,7 @@ describe("initializeTestSpec", () => {
 
     const content = await readFile(join(tempDir, "AGENTS.md"), "utf8");
 
-    expect(content).toContain("BEGIN TESTPILOT AGENT WORKFLOW");
+    expect(content).toContain("BEGIN TESTSPEC AGENT WORKFLOW");
     expect(content).toContain("Generic Agent guidance");
     expect(content).toContain("testspec new <name> --requirement <path>");
   });
@@ -156,9 +156,9 @@ describe("initializeTestSpec", () => {
       [
         "# Existing Guidance",
         "",
-        "<!-- BEGIN TESTPILOT AGENT WORKFLOW -->",
+        "<!-- BEGIN TESTSPEC AGENT WORKFLOW -->",
         "custom TestSpec section",
-        "<!-- END TESTPILOT AGENT WORKFLOW -->",
+        "<!-- END TESTSPEC AGENT WORKFLOW -->",
         "",
         "Keep this.",
       ].join("\n")
