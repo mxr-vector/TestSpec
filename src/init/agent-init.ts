@@ -1,5 +1,5 @@
-import { constants } from "node:fs";
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { constants, type Dirent } from "node:fs";
+import { access, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { stdin as defaultInput, stdout as defaultOutput } from "node:process";
 import type { ReadStream, WriteStream } from "node:tty";
@@ -140,6 +140,7 @@ export interface InitResult {
   created: string[];
   refreshed: string[];
   preserved: string[];
+  removed: string[];
 }
 
 interface WriteResult {
@@ -216,7 +217,12 @@ export async function initializeTestSpec(options: InitOptions = {}): Promise<Ini
     created: [],
     refreshed: [],
     preserved: [],
+    removed: [],
   };
+
+  const removedCommandFiles = await cleanupGeneratedCommandFiles(cwd);
+  const removedCommandFileSet = new Set(removedCommandFiles);
+  result.removed.push(...removedCommandFiles);
 
   const archiveDir = join(cwd, WORKSPACE_ROOT, CHANGES_DIR, ARCHIVE_DIR);
   await mkdir(archiveDir, { recursive: true });
@@ -226,11 +232,11 @@ export async function initializeTestSpec(options: InitOptions = {}): Promise<Ini
   );
 
   if (selectedAgents.includes("claude")) {
-    await writeCommandFiles(cwd, ".claude", options.force === true, result);
+    await writeCommandFiles(cwd, ".claude", options.force === true, removedCommandFileSet, result);
   }
 
   if (selectedAgents.includes("qoder")) {
-    await writeCommandFiles(cwd, ".qoder", options.force === true, result);
+    await writeCommandFiles(cwd, ".qoder", options.force === true, removedCommandFileSet, result);
   }
 
   if (selectedAgents.includes("codex") || selectedAgents.includes("generic")) {
@@ -340,16 +346,63 @@ function isInteractiveInput(input: NodeJS.ReadStream): input is ReadStream {
   return input.isTTY === true && typeof (input as ReadStream).setRawMode === "function";
 }
 
+async function cleanupGeneratedCommandFiles(cwd: string): Promise<string[]> {
+  const removed: string[] = [];
+
+  for (const rootDir of [".claude", ".qoder"] as const) {
+    const commandDir = join(cwd, rootDir, "commands", "test");
+    let entries: Dirent<string>[];
+    try {
+      entries = await readdir(commandDir, { encoding: "utf8", withFileTypes: true });
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        continue;
+      }
+      throw error;
+    }
+
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".md")) {
+        continue;
+      }
+
+      const outputPath = join(commandDir, entry.name);
+      try {
+        const existing = await readFile(outputPath, "utf8");
+        if (!existing.includes(GENERATED_FILE_MARKER)) {
+          continue;
+        }
+
+        await rm(outputPath, { force: true });
+        removed.push(outputPath);
+      } catch (error: unknown) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+
+  return removed;
+}
+
 async function writeCommandFiles(
   cwd: string,
   rootDir: ".claude" | ".qoder",
   force: boolean,
+  removedCommandFileSet: ReadonlySet<string>,
   result: InitResult
 ): Promise<void> {
   for (const command of WORKFLOW_COMMANDS) {
     const outputPath = join(cwd, rootDir, "commands", "test", `${command.id}.md`);
     const writeResult = await writeGeneratedFile(outputPath, renderCommandFile(command), force);
-    collectWriteResult(result, writeResult);
+    collectWriteResult(
+      result,
+      writeResult.status === "created" && removedCommandFileSet.has(outputPath)
+        ? { status: "refreshed", path: writeResult.path }
+        : writeResult
+    );
   }
 }
 

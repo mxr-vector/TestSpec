@@ -36,7 +36,7 @@ npx @wangjh2001/test-spec new <test-name> --requirement <path>
 testspec init
 ```
 
-This sets up the TestSpec workspace and configures AI agent integrations. By default, the interactive selection starts with Claude Code and Codex selected. Use Space to select/deselect integrations and Enter to confirm.
+This sets up the TestSpec workspace and configures AI agent integrations. By default, the interactive selection starts with Claude Code and Codex selected. Use Space to select/deselect integrations and Enter to confirm. Before regenerating agent command files, init removes stale TestSpec-generated `.claude/commands/test/*.md` and `.qoder/commands/test/*.md` files that still contain the generated marker; custom command files without the marker are preserved. Command files with the generated marker are treated as TestSpec-managed and may be deleted/recreated by `testspec init`.
 
 Available integrations:
 

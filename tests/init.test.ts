@@ -8,6 +8,7 @@ import { createProgram } from "../src/cli.js";
 import { registerInitCommand } from "../src/commands/init.js";
 import {
   createAgentSelectionItems,
+  GENERATED_FILE_MARKER,
   initializeTestSpec,
   parseAgentSelection,
   promptAgentSelection,
@@ -198,12 +199,32 @@ describe("initializeTestSpec", () => {
     expect(content).toContain("Keep this.");
   });
 
-  it("is idempotent and refreshes generated command files", async () => {
+  it("is idempotent and refreshes generated command files after cleanup", async () => {
     await initializeTestSpec({ agents: "claude,codex" });
     const second = await initializeTestSpec({ agents: "claude,codex" });
 
-    expect(second.refreshed.length).toBeGreaterThan(0);
+    expect(second.removed.length).toBe(WORKFLOW_COMMANDS.length);
+    expect(second.created.length).toBe(0);
+    expect(second.refreshed.length).toBe(WORKFLOW_COMMANDS.length);
     expect(second.preserved.some((path) => path.endsWith("AGENTS.md"))).toBe(true);
+    await expect(
+      readFile(join(tempDir, ".claude", "commands", "test", "new.md"), "utf8")
+    ).resolves.toContain("/test:new");
+  });
+
+  it("removes stale generated command files before regenerating selected commands", async () => {
+    const commandDir = join(tempDir, ".claude", "commands", "test");
+    const stalePath = join(commandDir, "old.md");
+    await mkdir(commandDir, { recursive: true });
+    await writeFile(stalePath, `${GENERATED_FILE_MARKER}\n\n# /test:old\n`);
+
+    const result = await initializeTestSpec({ agents: "claude" });
+
+    expect(
+      result.removed.some((path) => path.endsWith(join(".claude", "commands", "test", "old.md")))
+    ).toBe(true);
+    await expect(readFile(stalePath, "utf8")).rejects.toThrow();
+    await expect(readFile(join(commandDir, "new.md"), "utf8")).resolves.toContain("/test:new");
   });
 
   it("preserves custom command files unless force is provided", async () => {
@@ -212,6 +233,7 @@ describe("initializeTestSpec", () => {
     await writeFile(customPath, "custom command\n");
 
     const first = await initializeTestSpec({ agents: "claude" });
+    expect(first.removed).not.toContain(customPath);
     expect(first.preserved.some((path) => path.endsWith(".claude/commands/test/new.md"))).toBe(
       true
     );
@@ -221,6 +243,21 @@ describe("initializeTestSpec", () => {
     await expect(readFile(customPath, "utf8")).resolves.toContain(
       "testspec new <name> --requirement <path>"
     );
+  });
+
+  it("removes generated command files for integrations omitted from the current selection", async () => {
+    const qoderCommandDir = join(tempDir, ".qoder", "commands", "test");
+    const stalePath = join(qoderCommandDir, "excel.md");
+    await mkdir(qoderCommandDir, { recursive: true });
+    await writeFile(stalePath, `${GENERATED_FILE_MARKER}\n\n# /test:excel\n`);
+
+    const result = await initializeTestSpec({ agents: "codex" });
+
+    expect(
+      result.removed.some((path) => path.endsWith(join(".qoder", "commands", "test", "excel.md")))
+    ).toBe(true);
+    await expect(readFile(stalePath, "utf8")).rejects.toThrow();
+    await expect(readFile(join(qoderCommandDir, "new.md"), "utf8")).rejects.toThrow();
   });
 
   it("uses non-TTY defaults without hanging", async () => {

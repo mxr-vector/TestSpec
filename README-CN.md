@@ -36,7 +36,7 @@ npx @wangjh2001/test-spec new <测试名称> --requirement <path>
 testspec init
 ```
 
-此命令会设置 TestSpec 工作区并配置 AI 代理集成。交互式选择默认选中 Claude Code 和 Codex，可使用空格键选择/取消选择集成，按 Enter 确认。
+此命令会设置 TestSpec 工作区并配置 AI 代理集成。交互式选择默认选中 Claude Code 和 Codex，可使用空格键选择/取消选择集成，按 Enter 确认。重新生成代理命令文件前，init 会移除仍包含生成标记的 TestSpec 旧 `.claude/commands/test/*.md` 和 `.qoder/commands/test/*.md` 文件；不含生成标记的自定义命令文件会被保留。带有生成标记的命令文件会被视为 TestSpec 托管文件，可能被 `testspec init` 删除并重建。
 
 可用集成：
 

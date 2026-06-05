@@ -27,8 +27,9 @@ export function registerInitCommand(program: Command): void {
       logSuccess("Initialized TestSpec workspace.");
       logInfo(`Selected agents: ${result.selectedAgents.join(", ")}`);
       logInfo(`Workspace directories: ${result.directories.join(", ")}`);
+      logInfo("Cleaned generated command files from: .claude/commands/test, .qoder/commands/test.");
       logInfo(
-        `Outputs: ${result.created.length} created, ${result.refreshed.length} refreshed, ${result.preserved.length} preserved.`
+        `Outputs: ${result.created.length} created, ${result.refreshed.length} refreshed, ${result.preserved.length} preserved, ${result.removed.length} removed.`
       );
     });
 }
