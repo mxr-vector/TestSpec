@@ -24,8 +24,8 @@ npm install -g @wangjh2001/test-spec
 或使用 npx 免安装运行：
 
 ```bash
-npx testspec init
-npx testspec new <测试名称>
+npx @wangjh2001/test-spec init
+npx @wangjh2001/test-spec new <测试名称> --requirement <path>
 ```
 
 ## 快速开始
@@ -36,7 +36,7 @@ npx testspec new <测试名称>
 testspec init
 ```
 
-此命令会设置 TestSpec 工作区并配置 AI 代理集成。在交互模式下，使用空格键选择/取消选择集成，按 Enter 确认。
+此命令会设置 TestSpec 工作区并配置 AI 代理集成。交互式选择默认选中 Claude Code 和 Codex，可使用空格键选择/取消选择集成，按 Enter 确认。
 
 可用集成：
 
@@ -58,10 +58,10 @@ testspec init --agents all
 ### 2. 创建测试变更
 
 ```bash
-testspec new login-v2 --requirement docs/login-prd.md
+testspec new login-v2 --requirement docs/login-prd.md --object "登录服务"
 ```
 
-这会创建一个新的测试变更目录和提案模板。
+这会创建一个新的测试变更目录和提案模板。`--requirement` 接受本地路径或 URL，`--object` 记录被测对象名称，`--force` 会覆盖已有工作区。
 
 ### 3. 执行工作流
 
@@ -100,22 +100,23 @@ testspec archive login-v2
 
 ## 命令列表
 
-| CLI 命令                                   | 工作流标签      | 斜杠命令         | 说明                                   |
-| ------------------------------------------ | --------------- | ---------------- | -------------------------------------- |
-| `testspec init`                            | —               | —                | 初始化项目并配置 AI 代理集成           |
-| `testspec new <name> --requirement <path>` | `test:new`      | `/test:new`      | 从需求文档创建测试提案工作区           |
-| `testspec analysis [name]`                 | `test:analysis` | `/test:analysis` | 将需求分解为可测试项、风险和待确认问题 |
-| `testspec points [name]`                   | `test:points`   | `/test:points`   | 为测试变更生成 fallback/template 测试点 |
-| `testspec validate [name]`                 | `test:validate` | `/test:validate` | 校验生成产物的 schema、可追溯性和质量  |
-| `testspec excel [name]`                    | `test:excel`    | `/test:excel`    | 导出可执行的 Excel 测试用例            |
-| `testspec mind [name]`                     | `test:mind`     | `/test:mind`     | 导出用于评审的思维导图样式测试用例     |
-| `testspec report [name]`                   | `test:report`   | `/test:report`   | 从 Excel 执行结果生成执行统计信息      |
-| `testspec archive [name]`                  | `test:archive`  | `/test:archive`  | 归档完整测试产物链以实现可追溯性       |
-| `testspec list`                            | —               | —                | 列出活跃和已归档的变更                 |
-| `testspec --help`                          | —               | —                | 显示帮助信息                           |
-| `testspec --version`                       | —               | —                | 显示版本                               |
+| CLI 命令                                                 | 工作流标签      | 斜杠命令         | 说明                                   |
+| -------------------------------------------------------- | --------------- | ---------------- | -------------------------------------- |
+| `testspec init [--agents <ids|all>] [--force]`           | —               | —                | 初始化项目并配置 AI 代理集成           |
+| `testspec new <name> [--requirement <path>] [--object <name>] [--force]` | `test:new`      | `/test:new`      | 从需求文档创建测试提案工作区           |
+| `testspec analysis [name]`                               | `test:analysis` | `/test:analysis` | 将需求分解为可测试项、风险和待确认问题 |
+| `testspec points [name]`                                 | `test:points`   | `/test:points`   | 为测试变更生成 fallback/template 测试点 |
+| `testspec validate [name]`                               | `test:validate` | `/test:validate` | 校验生成产物的 schema、可追溯性和质量  |
+| `testspec excel [name]`                                  | `test:excel`    | `/test:excel`    | 导出可执行的 Excel 测试用例            |
+| `testspec mind [name]`                                   | `test:mind`     | `/test:mind`     | 导出用于评审的思维导图样式测试用例     |
+| `testspec report [name]`                                 | `test:report`   | `/test:report`   | 从 Excel 执行结果生成执行统计信息      |
+| `testspec archive [name]`                                | `test:archive`  | `/test:archive`  | 归档完整测试产物链以实现可追溯性       |
+| `testspec --help`                                        | —               | —                | 显示帮助信息                           |
+| `testspec --version`                                     | —               | —                | 显示版本                               |
 
-当命令接受 `[name]` 参数时，TestSpec 会使用提供的显式名称。如果省略，它会推断唯一的活跃变更；当存在多个变更时，会提示输入显式名称。
+`--agents` 接受 `claude`、`qoder`、`codex`、`generic` 或 `all`；多个代理 ID 使用英文逗号分隔，例如 `--agents claude,qoder,codex`。对 `testspec init` 使用 `--force` 会刷新已有的 TestSpec 生成代理命令文件；对 `testspec new` 使用 `--force` 会覆盖已有测试变更工作区。
+
+当命令接受 `[name]` 参数时，TestSpec 会使用提供的显式名称。如果省略，它会推断唯一的活跃变更；当存在多个变更时，会要求你指定变更名称。
 
 ## Excel 导出
 

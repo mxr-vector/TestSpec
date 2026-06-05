@@ -24,8 +24,8 @@ npm install -g @wangjh2001/test-spec
 Or use npx without installation:
 
 ```bash
-npx testspec init
-npx testspec new <test-name>
+npx @wangjh2001/test-spec init
+npx @wangjh2001/test-spec new <test-name> --requirement <path>
 ```
 
 ## Quick Start
@@ -36,7 +36,7 @@ npx testspec new <test-name>
 testspec init
 ```
 
-This sets up the TestSpec workspace and configures AI agent integrations. In interactive mode, use Space to select/deselect integrations and Enter to confirm.
+This sets up the TestSpec workspace and configures AI agent integrations. By default, the interactive selection starts with Claude Code and Codex selected. Use Space to select/deselect integrations and Enter to confirm.
 
 Available integrations:
 
@@ -58,10 +58,10 @@ testspec init --agents all
 ### 2. Create a Test Change
 
 ```bash
-testspec new login-v2 --requirement docs/login-prd.md
+testspec new login-v2 --requirement docs/login-prd.md --object "Login service"
 ```
 
-This creates a new test change directory with a proposal template.
+This creates a new test change directory with a proposal template. `--requirement` accepts a local path or URL, `--object` records the tested object name, and `--force` overwrites an existing workspace.
 
 ### 3. Run the Workflow
 
@@ -100,22 +100,23 @@ testspec archive login-v2
 
 ## Commands
 
-| CLI command                                | Workflow label  | Slash command    | Description                                                      |
-| ------------------------------------------ | --------------- | ---------------- | ---------------------------------------------------------------- |
-| `testspec init`                            | —               | —                | Initialize project with AI agent integrations                    |
-| `testspec new <name> --requirement <path>` | `test:new`      | `/test:new`      | Create a test proposal workspace from a requirement document     |
-| `testspec analysis [name]`                 | `test:analysis` | `/test:analysis` | Decompose requirements into testable items, risks, and questions |
-| `testspec points [name]`                   | `test:points`   | `/test:points`   | Generate fallback/template test points for a test change         |
-| `testspec validate [name]`                 | `test:validate` | `/test:validate` | Validate generated artifacts for schema, traceability, and quality |
-| `testspec excel [name]`                    | `test:excel`    | `/test:excel`    | Export executable Excel test cases                               |
-| `testspec mind [name]`                     | `test:mind`     | `/test:mind`     | Export mind-map style test cases for review                      |
-| `testspec report [name]`                   | `test:report`   | `/test:report`   | Generate execution statistics from Excel results                 |
-| `testspec archive [name]`                  | `test:archive`  | `/test:archive`  | Archive the full test artifact chain for traceability            |
-| `testspec list`                            | —               | —                | List active and archived changes                                 |
-| `testspec --help`                          | —               | —                | Display help information                                         |
-| `testspec --version`                       | —               | —                | Display version                                                  |
+| CLI command                                              | Workflow label  | Slash command    | Description                                                      |
+| -------------------------------------------------------- | --------------- | ---------------- | ---------------------------------------------------------------- |
+| `testspec init [--agents <ids|all>] [--force]`           | —               | —                | Initialize project with AI agent integrations                    |
+| `testspec new <name> [--requirement <path>] [--object <name>] [--force]` | `test:new`      | `/test:new`      | Create a test proposal workspace from a requirement document     |
+| `testspec analysis [name]`                               | `test:analysis` | `/test:analysis` | Decompose requirements into testable items, risks, and questions |
+| `testspec points [name]`                                 | `test:points`   | `/test:points`   | Generate fallback/template test points for a test change         |
+| `testspec validate [name]`                               | `test:validate` | `/test:validate` | Validate generated artifacts for schema, traceability, and quality |
+| `testspec excel [name]`                                  | `test:excel`    | `/test:excel`    | Export executable Excel test cases                               |
+| `testspec mind [name]`                                   | `test:mind`     | `/test:mind`     | Export mind-map style test cases for review                      |
+| `testspec report [name]`                                 | `test:report`   | `/test:report`   | Generate execution statistics from Excel results                 |
+| `testspec archive [name]`                                | `test:archive`  | `/test:archive`  | Archive the full test artifact chain for traceability            |
+| `testspec --help`                                        | —               | —                | Display help information                                         |
+| `testspec --version`                                     | —               | —                | Display version                                                  |
 
-When a command accepts `[name]`, TestSpec uses the explicit name if provided. If omitted, it infers the only active change; when multiple exist, it prompts for an explicit name.
+`--agents` accepts `claude`, `qoder`, `codex`, `generic`, or `all`; multiple agent IDs are comma-separated, for example `--agents claude,qoder,codex`. Use `--force` with `testspec init` to refresh existing TestSpec-generated agent command files, or with `testspec new` to overwrite an existing test change workspace.
+
+When a command accepts `[name]`, TestSpec uses the explicit name if provided. If omitted, it infers the only active change; when multiple exist, it asks you to specify the change name.
 
 ## Excel Export
 
