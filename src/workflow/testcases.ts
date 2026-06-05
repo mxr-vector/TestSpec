@@ -2,6 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ChangeWorkspace } from "./workspace.js";
 
+/** @legacy Kept for backward-compatible reading of traceability-rich artifacts. */
 export interface SourceRef {
   document: string;
   section?: string;
@@ -9,19 +10,19 @@ export interface SourceRef {
 }
 
 export interface TestCase {
-  caseId: string;
   title: string;
   module: string;
   type: string;
   priority: "P0" | "P1" | "P2";
-  requirementIds: string[];
-  testPointIds: string[];
-  riskIds: string[];
-  sourceRefs?: SourceRef[];
   preconditions: string;
-  testData?: string;
   steps: string[];
   expectedResult: string;
+  caseId?: string;
+  requirementIds?: string[];
+  testPointIds?: string[];
+  riskIds?: string[];
+  sourceRefs?: SourceRef[];
+  testData?: string;
   executionResult?: string;
   actualResult?: string;
   defectId?: string;
@@ -89,35 +90,20 @@ export function parseTestPoints(content: string): TestPoint[] {
 }
 
 function createCaseFromPoint(point: TestPoint, index: number): TestCase {
-  const caseNumber = String(index + 1).padStart(3, "0");
   const type = inferType(point.section);
 
   return {
-    caseId: `TC-${caseNumber}`,
     title: point.title,
     module: point.section,
     type,
     priority: index === 0 ? "P0" : "P1",
-    requirementIds: ["REQ-001"],
-    testPointIds: [point.id],
-    riskIds: point.section.includes("风险") ? ["RISK-001"] : [],
-    sourceRefs: [
-      {
-        document: "specs/testpoints.md",
-        section: point.section,
-        quote: `[${point.id}] ${point.title}`,
-      },
-    ],
-    preconditions: "待由 Agent 根据需求文档补充具体环境、账号、数据和依赖条件。",
-    testData: "待由 Agent 根据需求文档补充具体测试数据。",
+    preconditions: "待根据需求补充执行前置条件。",
     steps: [
-      `评审测试点 ${point.id}：${point.title}`,
-      "根据关联需求文档补充可执行的具体操作步骤。",
-      "根据需求原文补充可观察的结果断言。",
+      "根据需求补充具体操作步骤。",
+      "观察页面、接口或数据状态变化。",
+      "核对可观察结果是否符合需求约束。",
     ],
-    expectedResult: "待由 Agent 根据需求文档补充具体、可观察的预期结果。",
-    notes:
-      "CLI fallback/template case; use an Agent workflow to generate requirement-grounded details.",
+    expectedResult: "结果可观察且符合需求约束。",
   };
 }
 

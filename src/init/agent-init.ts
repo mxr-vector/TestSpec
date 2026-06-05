@@ -77,7 +77,7 @@ export const PROVIDER_NEUTRAL_PROMPT_RULES = [
   "The coding agent performs semantic generation; the TestSpec CLI remains provider-free and deterministic.",
   "Always read `proposal.md` and the referenced requirement document before generating semantic artifacts.",
   "If the requirement document is missing, unreadable, remote, or ambiguous, stop and ask the user for readable content or explicit authorization; do not guess.",
-  "Every generated requirement, test point, and test case must trace to requirement IDs and source evidence when available.",
+  "Keep traceability in requirement analysis and test-point artifacts when available; compact test cases do not need to duplicate per-case test point IDs or source evidence by default.",
   "Use `待确认` or clarification questions for unspecified behavior instead of fabricating business rules, roles, state transitions, limits, or SLA values.",
   "Generate concrete executable steps and observable expected results; avoid generic template wording such as 'execute operation' or '符合需求'.",
   "Run `testspec validate [name]` before export workflows and fix blocking validation errors before producing Excel or mind-map artifacts.",
@@ -464,15 +464,18 @@ function agentWorkflowInstructions(command: WorkflowCommand): string[] {
       "Agent workflow:",
       "",
       "1. Read `proposal.md`, `requirements-analysis.md`, `specs/testpoints.md`, and available requirement evidence.",
-      "2. Generate or update `artifacts/testcases.json` with executable steps, observable expected results, requirement/test-point/risk traceability, and `sourceRefs`; include separate test data only when requirement evidence or executability requires it.",
-      "3. Run `testspec validate [name]` and fix blocking errors before export.",
-      "4. Run the backing CLI export command:",
+      "2. Generate or update `artifacts/testcases.json` as compact executable cases. Default fields only: `title`, `module`, `type`, `priority`, `preconditions`, `steps`, and `expectedResult`.",
+      "3. Do not generate verbose/runtime fields by default: `caseId`, `testPointIds`, `riskIds`, `sourceRefs`, `testData`, `executionResult`, `actualResult`, `defectId`, or `notes`.",
+      "4. If concrete data is required for executability, embed it directly in the relevant precondition or step instead of creating a separate `testData` field.",
+      "5. Generate concrete executable steps and observable expected results grounded in requirement evidence; keep each case concise and execution-oriented.",
+      "6. Run `testspec validate [name]` and fix blocking errors before export. Treat compact-field warnings as instructions to remove unnecessary fields unless the user explicitly requested traceability-rich output.",
+      "7. Run the backing CLI export command:",
       "",
       "```bash",
       command.backingCommand,
       "```",
       "",
-      "5. Report validation status and the exported workbook path.",
+      "8. Report validation status and the exported workbook path.",
     ];
   }
 
@@ -536,8 +539,8 @@ function renderAgentsSection(selectedAgents: readonly AgentId[]): string {
     "1. `test:new` creates `testspec/changes/<name>/proposal.md`.",
     "2. `test:analysis` creates grounded `requirements-analysis.md` from requirement evidence.",
     "3. `test:points` creates traceable `specs/testpoints.md`.",
-    "4. `test:excel` creates executable `artifacts/testcases.json`, runs `testspec validate`, and exports compact `artifacts/<name>_cases.xlsx`.",
-    "5. `test:validate` can be run independently to check schema, traceability, and quality.",
+    "4. `test:excel` creates compact executable `artifacts/testcases.json` using only default case fields (`title`, `module`, `type`, `priority`, `preconditions`, `steps`, `expectedResult`), runs `testspec validate`, and exports compact `artifacts/<name>_cases.xlsx`.",
+    "5. `test:validate` can be run independently to check compact schema and quality.",
     "6. `test:mind` creates `artifacts/<name>_cases.xmind` from the same structured cases.",
     "7. `test:report` creates `report.md` after Excel execution results are filled.",
     "8. `test:archive` moves the change to `testspec/changes/archive/<date>-<name>/`.",
@@ -555,10 +558,10 @@ function agentBehaviorSummary(command: WorkflowCommand): string {
     return "Agent derives traceable `specs/testpoints.md` from analysis and source evidence.";
   }
   if (command.id === "excel") {
-    return "Agent writes executable `artifacts/testcases.json`, validates it, then exports compact Excel.";
+    return "Agent writes compact executable `artifacts/testcases.json`, validates it, then exports compact Excel.";
   }
   if (command.id === "validate") {
-    return "CLI validates schema, traceability, and quality of generated artifacts.";
+    return "CLI validates compact schema and quality of generated artifacts.";
   }
   return command.description;
 }

@@ -7,15 +7,11 @@ const UNKNOWN_TARGET = "待确认";
 const PENDING_METRIC = "待执行后填写";
 
 export interface PerformanceCase {
-  scenarioId: string;
   module: string;
   scenarioName: string;
   performanceType: string;
-  requirementIds: string[];
-  testPointIds: string[];
   objective: string;
   preconditions: string;
-  testData: string;
   concurrentUsers: string;
   duration: string;
   steps: string[];
@@ -23,13 +19,17 @@ export interface PerformanceCase {
   actualThroughput: string;
   avgResponseTime: string;
   p95ResponseTime: string;
-  p99ResponseTime: string;
   errorRate: string;
-  cpuPeak: string;
-  memoryPeak: string;
-  bottleneckAnalysis: string;
-  executionResult: string;
-  notes: string;
+  scenarioId?: string;
+  requirementIds?: string[];
+  testPointIds?: string[];
+  testData?: string;
+  p99ResponseTime?: string;
+  cpuPeak?: string;
+  memoryPeak?: string;
+  bottleneckAnalysis?: string;
+  executionResult?: string;
+  notes?: string;
 }
 
 interface PerformanceCandidate {
@@ -61,9 +61,7 @@ export async function generatePerformanceCases(
 ): Promise<PerformanceCase[]> {
   const context = await readPerformanceContext(workspace);
   const candidates = inferPerformanceCandidates(context.testpoints, context.combinedText);
-  const cases = candidates
-    .slice(0, MAX_PERFORMANCE_CASES)
-    .map((candidate, index) => createPerformanceCase(candidate, index));
+  const cases = candidates.slice(0, MAX_PERFORMANCE_CASES).map(createPerformanceCase);
   const outputPath = join(workspace.artifactsDir, "performance-cases.json");
 
   await writeFile(outputPath, `${JSON.stringify(cases, null, 2)}\n`);
@@ -212,35 +210,24 @@ function categoryRank(category: PerformanceCategory, section: string, title: str
   return ranks[category];
 }
 
-function createPerformanceCase(candidate: PerformanceCandidate, index: number): PerformanceCase {
-  const scenarioNumber = String(index + 1).padStart(3, "0");
+function createPerformanceCase(candidate: PerformanceCandidate): PerformanceCase {
   const subject = scenarioSubject(candidate.title);
   const config = categoryConfig(candidate.category, subject);
 
   return {
-    scenarioId: `PT-${scenarioNumber}`,
     module: candidate.section,
     scenarioName: config.scenarioName,
     performanceType: config.performanceType,
-    requirementIds: candidate.requirementIds.length > 0 ? candidate.requirementIds : ["REQ-001"],
-    testPointIds: [candidate.testPointId],
     objective: config.objective,
-    preconditions: "测试环境、账号、数据、监控和依赖服务已准备。",
-    testData: UNKNOWN_TARGET,
+    preconditions: "测试环境、账号、监控和依赖服务已准备。",
     concurrentUsers: UNKNOWN_TARGET,
     duration: "10min",
-    steps: ["准备压测脚本和测试数据", "按目标负载执行压测", "记录吞吐、响应时间、错误率和资源指标"],
+    steps: ["准备压测脚本", "按目标负载执行压测", "记录吞吐、响应时间和错误率"],
     targetThroughput: UNKNOWN_TARGET,
     actualThroughput: PENDING_METRIC,
     avgResponseTime: PENDING_METRIC,
     p95ResponseTime: PENDING_METRIC,
-    p99ResponseTime: PENDING_METRIC,
     errorRate: PENDING_METRIC,
-    cpuPeak: PENDING_METRIC,
-    memoryPeak: PENDING_METRIC,
-    bottleneckAnalysis: PENDING_METRIC,
-    executionResult: "未执行",
-    notes: "根据需求 SLA 和生产流量基线补充目标值。",
   };
 }
 

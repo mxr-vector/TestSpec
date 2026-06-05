@@ -5,8 +5,6 @@ import type { TestCase } from "./testcases.js";
 
 export const FUNCTIONAL_EXCEL_HEADERS = [
   "功能模块",
-  "需求编号",
-  "用例编号",
   "用例名称",
   "用例类型",
   "前置条件",
@@ -14,16 +12,12 @@ export const FUNCTIONAL_EXCEL_HEADERS = [
   "预期结果",
   "优先级",
   "执行结果",
-  "实际结果",
-  "缺陷编号",
 ] as const;
 
 export const PERFORMANCE_EXCEL_HEADERS = [
   "业务模块",
-  "场景编号",
   "场景名称",
   "性能测试类型",
-  "关联需求编号",
   "测试目标",
   "前置条件",
   "并发用户数",
@@ -116,7 +110,6 @@ export async function readExecutionRows(path: string): Promise<ExecutionRow[]> {
   const executionResultColumn = columns.get("执行结果");
 
   if (
-    caseIdColumn === undefined ||
     titleColumn === undefined ||
     moduleColumn === undefined ||
     typeColumn === undefined ||
@@ -126,8 +119,9 @@ export async function readExecutionRows(path: string): Promise<ExecutionRow[]> {
     return [];
   }
 
-  return dataRows.map((row) => ({
-    caseId: row[caseIdColumn] ?? "",
+  return dataRows.map((row, index) => ({
+    caseId:
+      caseIdColumn === undefined ? `row-${index + 2}` : (row[caseIdColumn] ?? `row-${index + 2}`),
     title: row[titleColumn] ?? "",
     module: row[moduleColumn] ?? "",
     type: row[typeColumn] ?? "",
@@ -141,8 +135,6 @@ function functionalRows(cases: TestCase[]): string[][] {
     [...FUNCTIONAL_EXCEL_HEADERS],
     ...cases.map((testCase) => [
       testCase.module,
-      testCase.requirementIds.join(", "),
-      testCase.caseId,
       testCase.title,
       testCase.type,
       testCase.preconditions,
@@ -150,8 +142,6 @@ function functionalRows(cases: TestCase[]): string[][] {
       testCase.expectedResult,
       testCase.priority,
       testCase.executionResult ?? "未执行",
-      testCase.actualResult ?? "",
-      testCase.defectId ?? "",
     ]),
   ];
 }
@@ -161,10 +151,8 @@ function performanceRows(cases: PerformanceCase[]): string[][] {
     [...PERFORMANCE_EXCEL_HEADERS],
     ...cases.map((testCase) => [
       testCase.module,
-      testCase.scenarioId,
       testCase.scenarioName,
       testCase.performanceType,
-      testCase.requirementIds.join(", "),
       testCase.objective,
       testCase.preconditions,
       testCase.concurrentUsers,
@@ -175,7 +163,7 @@ function performanceRows(cases: PerformanceCase[]): string[][] {
       testCase.avgResponseTime,
       testCase.p95ResponseTime,
       testCase.errorRate,
-      testCase.executionResult,
+      testCase.executionResult ?? "未执行",
     ]),
   ];
 }

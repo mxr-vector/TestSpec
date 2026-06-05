@@ -122,12 +122,12 @@ When a command accepts `[name]`, TestSpec uses the explicit name if provided. If
 
 `testspec excel [name]` exports `artifacts/<name>_cases.xlsx` with two worksheets:
 
-| Worksheet  | Purpose                                                                                                      |
-| ---------- | ------------------------------------------------------------------------------------------------------------ |
-| `功能测试` | Compact functional test cases with requirement IDs, steps, expected results, priority, and execution tracking |
-| `性能测试` | Compact performance scenarios with baseline targets, metrics, and execution tracking                          |
+| Worksheet  | Purpose                                                                                 |
+| ---------- | --------------------------------------------------------------------------------------- |
+| `功能测试` | Minimal functional test cases with steps, expected results, priority, and execution status |
+| `性能测试` | Compact performance scenarios with baseline targets, metrics, and execution status        |
 
-The Excel workbook is execution-oriented. Detailed traceability such as test point IDs, risk IDs, source evidence, and optional test data remains available in `artifacts/testcases.json` and related JSON artifacts instead of being exported as low-value columns.
+The Excel workbook is execution-oriented. Low-value columns such as case IDs, test point IDs, test data, actual results, defect IDs, notes, and source evidence are omitted by default. Compact `artifacts/testcases.json` generation focuses on executable fields (`title`, `module`, `type`, `priority`, `preconditions`, `steps`, `expectedResult`) and avoids duplicating per-case traceability unless a traceability-rich workflow is explicitly requested.
 
 The performance worksheet is generated from deterministic rules:
 

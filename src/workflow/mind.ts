@@ -16,18 +16,19 @@ export async function writeXmind(path: string, title: string, cases: TestCase[])
 function contentXml(title: string, cases: TestCase[]): string {
   const grouped = groupCases(cases);
   const modules = Object.entries(grouped)
-    .map(([module, byType]) => {
+    .map(([module, byType], moduleIndex) => {
       const typeTopics = Object.entries(byType)
         .map(([type, items]) => {
           const caseTopics = items
-            .map(
-              (testCase) =>
-                `<topic><title>${escapeXml(`${testCase.caseId} ${testCase.title}`)}</title><children><topics type="attached"><topic><title>${escapeXml(
-                  `优先级：${testCase.priority}`
-                )}</title></topic><topic><title>${escapeXml(
-                  `预期：${testCase.expectedResult}`
-                )}</title></topic></topics></children></topic>`
-            )
+            .map((testCase, index) => {
+              const compactId = `M${moduleIndex + 1}-${String(index + 1).padStart(2, "0")}`;
+              const caseTitle = `${testCase.caseId ?? compactId} ${testCase.title}`;
+              return `<topic><title>${escapeXml(caseTitle)}</title><children><topics type="attached"><topic><title>${escapeXml(
+                `优先级：${testCase.priority}`
+              )}</title></topic><topic><title>${escapeXml(
+                `预期：${testCase.expectedResult}`
+              )}</title></topic></topics></children></topic>`;
+            })
             .join("");
           return `<topic><title>${escapeXml(type)}</title><children><topics type="attached">${caseTopics}</topics></children></topic>`;
         })

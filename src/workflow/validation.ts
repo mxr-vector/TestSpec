@@ -40,6 +40,18 @@ const VAGUE_EXPECTED_RESULT_PATTERNS = [
   /^system behaves as expected[.]?$/i,
 ];
 
+const VERBOSE_COMPACT_FIELDS = [
+  "testData",
+  "executionResult",
+  "actualResult",
+  "defectId",
+  "notes",
+  "sourceRefs",
+  "riskIds",
+  "testPointIds",
+  "requirementIds",
+] as const;
+
 export async function validateWorkflowArtifacts(
   workspace: ChangeWorkspace
 ): Promise<ValidationResult> {
@@ -131,28 +143,16 @@ export function parseTestPointTraceability(content: string): ParsedTestPoint[] {
 
 function validateCaseSchema(cases: TestCase[], issues: ValidationIssue[]): void {
   for (const [index, testCase] of cases.entries()) {
-    const fallbackId = `case[${index}]`;
-    const caseId = stringValue(testCase.caseId) || fallbackId;
+    const caseId = caseLabel(testCase, index);
 
-    requireString(testCase.caseId, "caseId", caseId, issues);
     requireString(testCase.title, "title", caseId, issues);
     requireString(testCase.module, "module", caseId, issues);
     requireString(testCase.type, "type", caseId, issues);
     requireString(testCase.priority, "priority", caseId, issues);
     requireString(testCase.preconditions, "preconditions", caseId, issues);
     requireString(testCase.expectedResult, "expectedResult", caseId, issues);
-    requireNonEmptyArray(testCase.requirementIds, "requirementIds", caseId, issues);
-    requireNonEmptyArray(testCase.testPointIds, "testPointIds", caseId, issues);
     requireNonEmptyArray(testCase.steps, "steps", caseId, issues);
-    if (!Array.isArray(testCase.sourceRefs) || testCase.sourceRefs.length === 0) {
-      issues.push(
-        warning(
-          "MISSING_SOURCE_REFS",
-          "Field 'sourceRefs' is missing or empty; consider adding source evidence.",
-          caseId
-        )
-      );
-    }
+    warnVerboseFields(testCase, caseId, issues);
   }
 }
 
@@ -168,14 +168,15 @@ function validateTraceability(
   const knownTestPointIds = new Set(testpoints.map((point) => point.id));
   const knownRequirementIds = new Set(testpoints.flatMap((point) => point.requirementIds));
 
-  for (const testCase of cases) {
+  for (const [index, testCase] of cases.entries()) {
+    const caseId = caseLabel(testCase, index);
     for (const testPointId of testCase.testPointIds ?? []) {
       if (!knownTestPointIds.has(testPointId)) {
         issues.push(
           error(
             "UNKNOWN_TEST_POINT",
             `Referenced test point ${testPointId} does not exist in specs/testpoints.md.`,
-            testCase.caseId
+            caseId
           )
         );
       }
@@ -187,7 +188,7 @@ function validateTraceability(
           warning(
             "UNKNOWN_REQUIREMENT",
             `Requirement ${requirementId} not found in test points.`,
-            testCase.caseId
+            caseId
           )
         );
       }
@@ -200,13 +201,14 @@ function validateQuality(
   testpoints: ParsedTestPoint[],
   issues: ValidationIssue[]
 ): void {
-  for (const testCase of cases) {
+  for (const [index, testCase] of cases.entries()) {
+    const caseId = caseLabel(testCase, index);
     if (isGenericStepSet(testCase.steps ?? [])) {
       issues.push(
         warning(
           "GENERIC_STEPS",
           "Steps look like a generic template instead of concrete user/system actions.",
-          testCase.caseId
+          caseId
         )
       );
     }
@@ -218,14 +220,17 @@ function validateQuality(
         warning(
           "VAGUE_EXPECTED_RESULT",
           "Expected result is too vague to be executable or reviewable.",
-          testCase.caseId
+          caseId
         )
       );
     }
   }
 
   const knownRequirementIds = new Set(testpoints.flatMap((point) => point.requirementIds));
-  if (knownRequirementIds.size > 1 && cases.length > 1) {
+  const allCasesCarryRequirementIds = cases.every((testCase) =>
+    Array.isArray(testCase.requirementIds)
+  );
+  if (allCasesCarryRequirementIds && knownRequirementIds.size > 1 && cases.length > 1) {
     const allReq001 = cases.every(
       (testCase) =>
         (testCase.requirementIds ?? []).length === 1 && testCase.requirementIds?.[0] === "REQ-001"
@@ -234,7 +239,7 @@ function validateQuality(
       issues.push(
         warning(
           "SUSPICIOUS_REQ001_ONLY",
-          "All cases link only to REQ-001 even though multiple requirements appear in test points."
+          "Traceability-rich cases all link only to REQ-001 even though multiple requirements appear in test points."
         )
       );
     }
@@ -252,6 +257,28 @@ function validateQuality(
       )
     );
   }
+}
+
+function warnVerboseFields(testCase: TestCase, caseId: string, issues: ValidationIssue[]): void {
+  for (const field of VERBOSE_COMPACT_FIELDS) {
+    const value = testCase[field];
+    if (isPresent(value)) {
+      issues.push(
+        warning(
+          "VERBOSE_COMPACT_FIELD",
+          `Field '${field}' is outside the compact default generation contract; omit it unless traceability or execution context explicitly requires it.`,
+          caseId
+        )
+      );
+    }
+  }
+}
+
+function isPresent(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+  return value !== undefined && value !== null && value !== "";
 }
 
 function requireString(
@@ -307,6 +334,10 @@ function splitIssues(issues: ValidationIssue[]): ValidationResult {
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function caseLabel(testCase: TestCase, index: number): string {
+  return stringValue(testCase.caseId) || `case[${index}]`;
 }
 
 function error(code: string, message: string, caseId?: string): ValidationIssue {

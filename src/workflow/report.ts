@@ -168,7 +168,7 @@ function renderReport(name: string, stats: ReportStats): string {
     "",
     "## 缺陷分布",
     "",
-    "- 待补充缺陷编号、严重程度、所属模块和状态。",
+    "- 默认精简 Excel 不再导出缺陷编号；如需缺陷明细，请在外部缺陷系统或专项记录中维护。",
     "",
     "## 风险与遗留问题",
     "",

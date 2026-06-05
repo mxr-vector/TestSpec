@@ -45,7 +45,7 @@ function workbookEntry(workbook: Record<string, Uint8Array>, path: string): Uint
 }
 
 describe("performance cases", () => {
-  it("generates traceable performance cases from keyword rules", async () => {
+  it("generates compact performance cases from keyword rules", async () => {
     const workspace = await createChangeWorkspace("checkout-v2");
     await writeFile(
       join(workspace.specsDir, "testpoints.md"),
@@ -69,16 +69,17 @@ describe("performance cases", () => {
 
     expect(cases).toHaveLength(5);
     expect(persistedCases).toHaveLength(5);
-    expect(persistedCases[0]).toMatchObject({ scenarioId: "PT-001", testPointIds: ["TP-001"] });
+    expect(persistedCases[0]).not.toHaveProperty("scenarioId");
+    expect(persistedCases[0]).not.toHaveProperty("testPointIds");
+    expect(persistedCases[0]).not.toHaveProperty("testData");
+    expect(persistedCases[0]).not.toHaveProperty("notes");
     expect(cases[0]).toMatchObject({
-      scenarioId: "PT-001",
       performanceType: "负载测试",
-      requirementIds: ["REQ-001"],
-      testPointIds: ["TP-001"],
       concurrentUsers: "待确认",
       actualThroughput: "待执行后填写",
-      executionResult: "未执行",
     });
+    expect(cases[0]).not.toHaveProperty("requirementIds");
+    expect(cases[0]).not.toHaveProperty("executionResult");
     expect(cases[0]?.performanceType).toBe("负载测试");
     expect(cases[1]?.performanceType).toBe("压力测试");
     expect(cases[2]?.performanceType).toBe("容量测试");
@@ -132,20 +133,24 @@ describe("structured cases and exports", () => {
     const functionalSheetXml = strFromU8(workbookEntry(workbook, "xl/worksheets/sheet1.xml"));
     const performanceSheetXml = strFromU8(workbookEntry(workbook, "xl/worksheets/sheet2.xml"));
 
-    expect(cases[0]).toMatchObject({ caseId: "TC-001", testPointIds: ["TP-001"] });
-    expect(rows[0]).toMatchObject({ caseId: "TC-001", executionResult: "未执行" });
+    expect(cases[0]).not.toHaveProperty("caseId");
+    expect(cases[0]).not.toHaveProperty("testPointIds");
+    expect(rows[0]).toMatchObject({ caseId: "row-2", executionResult: "未执行" });
     expect(workbookXml).toContain('name="功能测试"');
     expect(workbookXml).toContain('name="性能测试"');
     expect(relationshipsXml).toContain('Target="worksheets/sheet1.xml"');
     expect(relationshipsXml).toContain('Target="worksheets/sheet2.xml"');
     expect(contentTypesXml).toContain("/xl/worksheets/sheet2.xml");
-    expect(functionalSheetXml).toContain("需求编号");
+    expect(functionalSheetXml).not.toContain("需求编号");
+    expect(functionalSheetXml).not.toContain("用例编号");
     expect(functionalSheetXml).not.toContain("测试点编号");
     expect(functionalSheetXml).not.toContain("<t>测试数据</t>");
     expect(functionalSheetXml).not.toContain("备注");
-    expect(functionalSheetXml).toContain("REQ-001");
-    expect(functionalSheetXml).toContain("实际结果");
-    expect(performanceSheetXml).toContain("场景编号");
+    expect(functionalSheetXml).not.toContain("REQ-001");
+    expect(functionalSheetXml).not.toContain("实际结果");
+    expect(functionalSheetXml).not.toContain("缺陷编号");
+    expect(functionalSheetXml).toContain("执行结果");
+    expect(performanceSheetXml).not.toContain("场景编号");
     expect(performanceSheetXml).toContain("P95响应时间(ms)");
     expect(performanceSheetXml).not.toContain("关联测试点编号");
     expect(performanceSheetXml).not.toContain("<t>测试数据</t>");
@@ -206,7 +211,8 @@ describe("structured cases and exports", () => {
     const cases = await readOrGenerateStructuredCases(workspace);
 
     expect(cases[0]).not.toMatchObject({ title: "新成功路径。" });
-    expect(cases[0]?.notes).toContain("CLI fallback/template case");
+    expect(cases[0]).not.toHaveProperty("notes");
+    expect(cases[0]).not.toHaveProperty("testData");
   });
 });
 
@@ -303,7 +309,6 @@ describe("validation", () => {
             expectedResult: "符合需求",
           },
           {
-            caseId: "TC-002",
             title: "模板用例 2",
             module: "注册",
             type: "正向",
@@ -326,10 +331,12 @@ describe("validation", () => {
 
     expect(validation.errors.some((issue) => issue.code === "MISSING_FIELD")).toBe(false);
     expect(validation.errors.some((issue) => issue.code === "UNKNOWN_TEST_POINT")).toBe(true);
-    expect(validation.warnings.some((issue) => issue.code === "MISSING_SOURCE_REFS")).toBe(true);
+    expect(validation.warnings.some((issue) => issue.code === "MISSING_SOURCE_REFS")).toBe(false);
+    expect(validation.warnings.some((issue) => issue.code === "VERBOSE_COMPACT_FIELD")).toBe(true);
     expect(validation.warnings.some((issue) => issue.code === "UNKNOWN_REQUIREMENT")).toBe(true);
     expect(validation.warnings.some((issue) => issue.code === "GENERIC_STEPS")).toBe(true);
     expect(validation.warnings.some((issue) => issue.code === "VAGUE_EXPECTED_RESULT")).toBe(true);
+    expect(output).toContain("[WARN] GENERIC_STEPS case[1]");
     expect(output).toContain("Validation errors:");
     expect(output).toContain("Validation warnings:");
   });
