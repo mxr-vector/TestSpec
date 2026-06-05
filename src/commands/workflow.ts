@@ -9,6 +9,7 @@ import {
   writeTestPoints,
 } from "../workflow/artifacts.js";
 import { writeXmind } from "../workflow/mind.js";
+import { readOrGeneratePerformanceCases } from "../workflow/performance.js";
 import { writeReport } from "../workflow/report.js";
 import { writeExcelWorkbook } from "../workflow/spreadsheet.js";
 import { readOrGenerateStructuredCases } from "../workflow/testcases.js";
@@ -69,8 +70,9 @@ export function registerWorkflowCommands(program: Command): void {
     .action(async (name?: string) => {
       const workspace = await resolveChangeWorkspace(name);
       const cases = await readOrGenerateStructuredCases(workspace);
+      const performanceCases = await readOrGeneratePerformanceCases(workspace);
       const outputPath = join(workspace.artifactsDir, `${workspace.name}_cases.xlsx`);
-      await writeExcelWorkbook(outputPath, cases);
+      await writeExcelWorkbook(outputPath, cases, performanceCases);
       logSuccess(`Exported Excel test cases: ${outputPath}`);
     });
 

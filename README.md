@@ -1,146 +1,195 @@
 # TestPilot
 
+> [中文文档](./README-CN.md)
+
 Requirement-driven test design CLI for AI-assisted QA workflows.
 
-## Status
+TestPilot is a CLI tool that helps QA teams create, manage, and track test artifacts through a structured workflow. It integrates with AI-powered agents like Claude Code, Qoder, and Codex to streamline the testing process.
 
-Early development. This project is currently establishing the TypeScript CLI foundation before implementing the test workflow commands.
+## Features
 
-## Initialize a Project
+- **Structured Workflow**: Follow a proven test design process from requirements to test cases
+- **AI Integration**: Works with Claude Code, Qoder, Codex, and other AI agents
+- **Excel Export**: Generate executable test cases with functional and performance worksheets
+- **Mind Map Export**: Create visual test case maps for review and collaboration
+- **Traceability**: Maintain links between requirements, test points, and test cases
+- **Archive System**: Organize and preserve completed test cycles
 
-After installing or linking the CLI, initialize a target project once:
+## Installation
+
+```bash
+npm install -g testpilot
+```
+
+Or use npx without installation:
+
+```bash
+npx testpilot init
+npx testpilot new <test-name>
+```
+
+## Quick Start
+
+### 1. Initialize Your Project
 
 ```bash
 testpilot init
 ```
 
-In an interactive terminal, `testpilot init` shows built-in Agent integrations and lets you choose them with an OpenSpec-style selector: use Space to select or deselect integrations, then press Enter to confirm.
+This sets up the TestPilot workspace and configures AI agent integrations. In interactive mode, use Space to select/deselect integrations and Enter to confirm.
 
-Built-in choices include:
+Available integrations:
 
-| Agent | Generated output |
-|---|---|
-| Claude Code | `.claude/commands/test/*.md` for `/test:new`, `/test:analysis`, and related slash commands |
-| Qoder | `.qoder/commands/test/*.md` for the same `/test:*` workflow labels |
-| Codex | `AGENTS.md` guidance mapping `test:*` labels to `testpilot` CLI commands |
-| Generic Agent guidance | Tool-agnostic `AGENTS.md` workflow guidance |
+| Agent       | Output                                                       |
+| ----------- | ------------------------------------------------------------ |
+| Claude Code | `.claude/commands/test/*.md` for `/test:*` slash commands    |
+| Qoder       | `.qoder/commands/test/*.md` for the same workflow labels     |
+| Codex       | `AGENTS.md` guidance mapping `test:*` labels to CLI commands |
+| Generic     | Tool-agnostic `AGENTS.md` workflow guidance                  |
 
-For scripted or CI setup, pass the integrations explicitly:
+For non-interactive setup:
 
 ```bash
 testpilot init --agents claude,qoder,codex
-# or initialize every built-in integration
+# or all integrations
 testpilot init --agents all
 ```
 
-When `testpilot init` runs outside an interactive terminal and `--agents` is omitted, it uses the default non-interactive selection: `claude,codex`.
-
-By default, existing custom command files are preserved. To overwrite existing TestPilot-generated command files and refresh the TestPilot-managed `AGENTS.md` section:
-
-```bash
-testpilot init --agents claude --force
-```
-
-`testpilot init` also creates the project-local workspace root:
-
-```text
-testpilot/
-  changes/
-    archive/
-```
-
-## Workflow
-
-TestPilot supports a requirement-driven QA workflow. The conceptual workflow labels map to `testpilot` CLI subcommands:
-
-| Workflow label | CLI command | Purpose |
-|---|---|---|
-| `test:new` | `testpilot new <name> --requirement <path>` | Create a test proposal from a requirement document |
-| `test:analysis` | `testpilot analysis [name]` | Decompose requirements into testable items and risks |
-| `test:points` | `testpilot points [name]` | Generate core scenario test points |
-| `test:excel` | `testpilot excel [name]` | Export executable Excel test cases |
-| `test:mind` | `testpilot mind [name]` | Export mind-map style cases for review and visualization |
-| `test:report` | `testpilot report [name]` | Read execution results and generate statistics |
-| `test:archive` | `testpilot archive [name]` | Archive the full test artifact chain for traceability |
-
-Example:
+### 2. Create a Test Change
 
 ```bash
 testpilot new login-v2 --requirement docs/login-prd.md
+```
+
+This creates a new test change directory with a proposal template.
+
+### 3. Run the Workflow
+
+```bash
+# Analyze requirements
 testpilot analysis login-v2
+
+# Generate test points
 testpilot points login-v2
+
+# Export test cases to Excel
 testpilot excel login-v2
+
+# Export mind map for review
 testpilot mind login-v2
-# Fill the Excel 执行结果 column, then:
+
+# Generate report (after filling execution results in Excel)
 testpilot report login-v2
+
+# Archive completed test cycle
 testpilot archive login-v2
 ```
 
-After `testpilot init`, Agent integrations can use the workflow labels directly. For example, Claude Code can use `/test:new login-v2 --requirement docs/login-prd.md`, while Codex can read `AGENTS.md` and map `test:new` to the backing `testpilot new` command. The `test:*` labels are Agent workflow labels, not shell commands.
+## Commands
 
-## Artifact Layout
+| CLI command                                 | Workflow label  | Slash command    | Description                                                  |
+| ------------------------------------------- | --------------- | ---------------- | ------------------------------------------------------------ |
+| `testpilot init`                            | —               | —                | Initialize project with AI agent integrations                |
+| `testpilot new <name> --requirement <path>` | `test:new`      | `/test:new`      | Create a test proposal workspace from a requirement document |
+| `testpilot analysis [name]`                 | `test:analysis` | `/test:analysis` | Decompose requirements into testable items, risks, and questions |
+| `testpilot points [name]`                   | `test:points`   | `/test:points`   | Generate core scenario test points for a test change         |
+| `testpilot excel [name]`                    | `test:excel`    | `/test:excel`    | Export executable Excel test cases                           |
+| `testpilot mind [name]`                     | `test:mind`     | `/test:mind`     | Export mind-map style test cases for review                  |
+| `testpilot report [name]`                   | `test:report`   | `/test:report`   | Generate execution statistics from Excel results             |
+| `testpilot archive [name]`                  | `test:archive`  | `/test:archive`  | Archive the full test artifact chain for traceability        |
+| `testpilot list`                            | —               | —                | List active and archived changes                             |
+| `testpilot --help`                          | —               | —                | Display help information                                     |
+| `testpilot --version`                       | —               | —                | Display version                                              |
 
-Active test changes are stored under `testpilot/changes/<name>/`:
+When a command accepts `[name]`, TestPilot uses the explicit name if provided. If omitted, it infers the only active change; when multiple exist, it prompts for an explicit name.
 
-```text
-testpilot/
-  changes/
-    login-v2/
-      proposal.md
-      requirements-analysis.md
-      specs/
-        testpoints.md
-      artifacts/
-        testcases.json
-        login-v2_cases.xlsx
-        login-v2_cases.xmind
-      report.md
-    archive/
-      2026-06-04-login-v2/
-        manifest.json
-        ...archived artifacts...
+## Excel Export
+
+`testpilot excel [name]` exports `artifacts/<name>_cases.xlsx` with two worksheets:
+
+| Worksheet  | Purpose                                                                                                               |
+| ---------- | --------------------------------------------------------------------------------------------------------------------- |
+| `功能测试` | Functional test cases with requirement IDs, test point IDs, steps, expected results, priority, and execution tracking |
+| `性能测试` | Performance scenarios derived from proposal and test points                                                           |
+
+The performance worksheet is generated from deterministic rules:
+
+- Core flows → load-test scenarios
+- Query/search/list/report flows → query performance scenarios
+- Submit/create/update/delete/order/payment flows → transaction or pressure-test scenarios
+- Batch/import/export/upload/download flows → capacity or stability scenarios
+- Dependency/callback/message/queue flows → stability scenarios
+
+Unknown business targets (concurrency, target TPS/QPS) remain `待确认` until specified.
+
+## Directory Structure
+
+After initialization and creating test changes, your project will have:
+
+```
+your-project/
+├── .claude/commands/test/    # Claude Code slash commands (if selected)
+├── .qoder/commands/test/     # Qoder commands (if selected)
+├── AGENTS.md                 # Generic agent guidance (if selected)
+└── testpilot/
+    ├── changes/
+    │   ├── login-v2/         # Active test change
+    │   │   ├── proposal.md              # Test proposal
+    │   │   ├── requirements-analysis.md # Requirement decomposition
+    │   │   ├── specs/
+    │   │   │   └── testpoints.md        # Test points
+    │   │   ├── artifacts/
+    │   │   │   ├── testcases.json       # Generated test cases
+    │   │   │   ├── performance-cases.json
+    │   │   │   ├── login-v2_cases.xlsx  # Excel export
+    │   │   │   └── login-v2_cases.xmind # Mind map export
+    │   │   └── report.md                # Execution report
+    │   └── archive/
+    │       └── 2026-06-04-login-v2/     # Archived change
+    │           ├── manifest.json
+    │           └── ...archived artifacts...
+    └── ...
 ```
 
-When a command accepts `[name]`, TestPilot uses the explicit change name when provided. If omitted, it infers the only active non-archived change; when multiple active changes exist, it asks for an explicit name.
+## Using with AI Agents
+
+After `testpilot init`, AI agents can use workflow labels directly:
+
+**Claude Code:**
+
+```
+/test:new login-v2 --requirement docs/login-prd.md
+/test:analysis login-v2
+/test:points login-v2
+/test:excel login-v2
+/test:mind login-v2
+/test:report login-v2
+/test:archive login-v2
+```
+
+**Codex / Generic Agents:**
+Reads `AGENTS.md` and maps `test:*` labels to `testpilot` CLI commands.
+
+The `test:*` labels are Agent workflow labels, not shell commands.
 
 ## Development
 
-Install dependencies:
-
 ```bash
+# Install dependencies
 npm install
-```
 
-Run the TypeScript CLI in development:
-
-```bash
+# Run in development mode
 npm run dev -- --help
-```
 
-Build the CLI:
-
-```bash
+# Build the CLI
 npm run build
-```
 
-Run checks:
-
-```bash
+# Run checks
 npm run typecheck
 npm run test
 npm run check
 ```
 
-Run the built CLI:
+## License
 
-```bash
-node dist/run.js --help
-```
-
-## CLI
-
-After the package is built or installed, the command name is:
-
-```bash
-testpilot
-```
+MIT
