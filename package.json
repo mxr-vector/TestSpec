@@ -3,6 +3,7 @@
   "version": "0.2.1",
   "author": "YuanJie",
   "license": "MIT",
+  "private": false,
   "description": "Requirement-driven test design CLI for AI-assisted QA workflows.",
   "keywords": [
     "cli",
