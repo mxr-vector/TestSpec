@@ -6,6 +6,15 @@ describe("createProgram", () => {
     const program = createProgram();
 
     expect(program.name()).toBe("testpilot");
-    expect(program.commands.some((command) => command.name() === "init")).toBe(true);
+    const commandNames = program.commands.map((command) => command.name());
+
+    expect(commandNames).toContain("init");
+    expect(commandNames).toContain("new");
+    expect(commandNames).toContain("analysis");
+    expect(commandNames).toContain("points");
+    expect(commandNames).toContain("excel");
+    expect(commandNames).toContain("mind");
+    expect(commandNames).toContain("report");
+    expect(commandNames).toContain("archive");
   });
 });

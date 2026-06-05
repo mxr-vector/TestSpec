@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { registerInitCommand } from "./commands/init.js";
+import { registerWorkflowCommands } from "./commands/workflow.js";
 import { getPackageInfo } from "./utils/package-info.js";
 
 export function createProgram(): Command {
@@ -12,6 +13,7 @@ export function createProgram(): Command {
     .version(packageInfo.version);
 
   registerInitCommand(program);
+  registerWorkflowCommands(program);
 
   return program;
 }
