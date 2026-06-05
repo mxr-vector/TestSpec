@@ -6,6 +6,49 @@ Requirement-driven test design CLI for AI-assisted QA workflows.
 
 Early development. This project is currently establishing the TypeScript CLI foundation before implementing the test workflow commands.
 
+## Initialize a Project
+
+After installing or linking the CLI, initialize a target project once:
+
+```bash
+testpilot init
+```
+
+In an interactive terminal, `testpilot init` shows built-in Agent integrations and lets you choose them with an OpenSpec-style selector: use Space to select or deselect integrations, then press Enter to confirm.
+
+Built-in choices include:
+
+| Agent | Generated output |
+|---|---|
+| Claude Code | `.claude/commands/test/*.md` for `/test:new`, `/test:analysis`, and related slash commands |
+| Qoder | `.qoder/commands/test/*.md` for the same `/test:*` workflow labels |
+| Codex | `AGENTS.md` guidance mapping `test:*` labels to `testpilot` CLI commands |
+| Generic Agent guidance | Tool-agnostic `AGENTS.md` workflow guidance |
+
+For scripted or CI setup, pass the integrations explicitly:
+
+```bash
+testpilot init --agents claude,qoder,codex
+# or initialize every built-in integration
+testpilot init --agents all
+```
+
+When `testpilot init` runs outside an interactive terminal and `--agents` is omitted, it uses the default non-interactive selection: `claude,codex`.
+
+By default, existing custom command files are preserved. To overwrite existing TestPilot-generated command files and refresh the TestPilot-managed `AGENTS.md` section:
+
+```bash
+testpilot init --agents claude --force
+```
+
+`testpilot init` also creates the project-local workspace root:
+
+```text
+testpilot/
+  changes/
+    archive/
+```
+
 ## Workflow
 
 TestPilot supports a requirement-driven QA workflow. The conceptual workflow labels map to `testpilot` CLI subcommands:
@@ -32,6 +75,8 @@ testpilot mind login-v2
 testpilot report login-v2
 testpilot archive login-v2
 ```
+
+After `testpilot init`, Agent integrations can use the workflow labels directly. For example, Claude Code can use `/test:new login-v2 --requirement docs/login-prd.md`, while Codex can read `AGENTS.md` and map `test:new` to the backing `testpilot new` command. The `test:*` labels are Agent workflow labels, not shell commands.
 
 ## Artifact Layout
 

@@ -1,7 +1,24 @@
 {
   "name": "test-pilot",
   "version": "0.1.0",
+  "author": "YuanJie",
+  "license": "MIT",
   "description": "Requirement-driven test design CLI for AI-assisted QA workflows.",
+  "keywords": [
+    "cli",
+    "testing",
+    "qa",
+    "test-case",
+    "requirements",
+    "ai",
+    "typescript"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mxr-vector/TestPilot"
+  },
+  "homepage": "",
+  "bugs": "https://github.com/mxr-vector/TestPilot/issues",
   "type": "module",
   "bin": {
     "testpilot": "./dist/run.js"
@@ -26,17 +43,6 @@
     "clean": "rm -rf dist",
     "prepack": "npm run build"
   },
-  "keywords": [
-    "cli",
-    "testing",
-    "qa",
-    "test-case",
-    "requirements",
-    "ai",
-    "typescript"
-  ],
-  "author": "",
-  "license": "MIT",
   "dependencies": {
     "chalk": "^5.6.2",
     "commander": "^15.0.0",

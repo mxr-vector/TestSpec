@@ -3,9 +3,9 @@ import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import type { TestCase } from "./testcases.js";
 
 export const EXCEL_HEADERS = [
+  "功能模块",
   "用例编号",
   "用例名称",
-  "功能模块",
   "类型",
   "前置条件",
   "测试步骤",
@@ -27,9 +27,9 @@ export async function writeExcelWorkbook(path: string, cases: TestCase[]): Promi
   const rows = [
     [...EXCEL_HEADERS],
     ...cases.map((testCase) => [
+      testCase.module,
       testCase.caseId,
       testCase.title,
-      testCase.module,
       testCase.type,
       testCase.preconditions,
       testCase.steps.map((step, index) => `${index + 1}. ${step}`).join("\n"),
@@ -62,9 +62,9 @@ export async function readExecutionRows(path: string): Promise<ExecutionRow[]> {
   const [, ...dataRows] = rows;
 
   return dataRows.map((row) => ({
-    caseId: row[0] ?? "",
-    title: row[1] ?? "",
-    module: row[2] ?? "",
+    caseId: row[1] ?? "",
+    title: row[2] ?? "",
+    module: row[0] ?? "",
     type: row[3] ?? "",
     priority: row[7] ?? "",
     executionResult: row[8] ?? "未执行",
