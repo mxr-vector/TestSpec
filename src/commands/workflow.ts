@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { Command } from "commander";
-import { TestPilotError } from "../core/errors.js";
+import { TestSpecError } from "../core/errors.js";
 import { logSuccess } from "../core/logger.js";
 import { archiveChange } from "../workflow/archive.js";
 import {
@@ -111,6 +111,6 @@ export function registerWorkflowCommands(program: Command): void {
 
 export function ensureWorkflowPreconditions(condition: boolean, message: string): void {
   if (!condition) {
-    throw new TestPilotError(message);
+    throw new TestSpecError(message);
   }
 }

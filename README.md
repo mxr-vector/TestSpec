@@ -4,7 +4,7 @@
 
 Requirement-driven test design CLI for AI-assisted QA workflows.
 
-TestPilot is a CLI tool that helps QA teams create, manage, and track test artifacts through a structured workflow. It integrates with AI-powered agents like Claude Code, Qoder, and Codex to streamline the testing process.
+TestSpec is a CLI tool that helps QA teams create, manage, and track test artifacts through a structured workflow. It integrates with AI-powered agents like Claude Code, Qoder, and Codex to streamline the testing process.
 
 ## Features
 
@@ -18,14 +18,14 @@ TestPilot is a CLI tool that helps QA teams create, manage, and track test artif
 ## Installation
 
 ```bash
-npm install -g testpilot
+npm install -g testspec
 ```
 
 Or use npx without installation:
 
 ```bash
-npx testpilot init
-npx testpilot new <test-name>
+npx testspec init
+npx testspec new <test-name>
 ```
 
 ## Quick Start
@@ -33,10 +33,10 @@ npx testpilot new <test-name>
 ### 1. Initialize Your Project
 
 ```bash
-testpilot init
+testspec init
 ```
 
-This sets up the TestPilot workspace and configures AI agent integrations. In interactive mode, use Space to select/deselect integrations and Enter to confirm.
+This sets up the TestSpec workspace and configures AI agent integrations. In interactive mode, use Space to select/deselect integrations and Enter to confirm.
 
 Available integrations:
 
@@ -50,15 +50,15 @@ Available integrations:
 For non-interactive setup:
 
 ```bash
-testpilot init --agents claude,qoder,codex
+testspec init --agents claude,qoder,codex
 # or all integrations
-testpilot init --agents all
+testspec init --agents all
 ```
 
 ### 2. Create a Test Change
 
 ```bash
-testpilot new login-v2 --requirement docs/login-prd.md
+testspec new login-v2 --requirement docs/login-prd.md
 ```
 
 This creates a new test change directory with a proposal template.
@@ -67,45 +67,45 @@ This creates a new test change directory with a proposal template.
 
 ```bash
 # Analyze requirements
-testpilot analysis login-v2
+testspec analysis login-v2
 
 # Generate test points
-testpilot points login-v2
+testspec points login-v2
 
 # Export test cases to Excel
-testpilot excel login-v2
+testspec excel login-v2
 
 # Export mind map for review
-testpilot mind login-v2
+testspec mind login-v2
 
 # Generate report (after filling execution results in Excel)
-testpilot report login-v2
+testspec report login-v2
 
 # Archive completed test cycle
-testpilot archive login-v2
+testspec archive login-v2
 ```
 
 ## Commands
 
-| CLI command                                 | Workflow label  | Slash command    | Description                                                  |
-| ------------------------------------------- | --------------- | ---------------- | ------------------------------------------------------------ |
-| `testpilot init`                            | —               | —                | Initialize project with AI agent integrations                |
-| `testpilot new <name> --requirement <path>` | `test:new`      | `/test:new`      | Create a test proposal workspace from a requirement document |
-| `testpilot analysis [name]`                 | `test:analysis` | `/test:analysis` | Decompose requirements into testable items, risks, and questions |
-| `testpilot points [name]`                   | `test:points`   | `/test:points`   | Generate core scenario test points for a test change         |
-| `testpilot excel [name]`                    | `test:excel`    | `/test:excel`    | Export executable Excel test cases                           |
-| `testpilot mind [name]`                     | `test:mind`     | `/test:mind`     | Export mind-map style test cases for review                  |
-| `testpilot report [name]`                   | `test:report`   | `/test:report`   | Generate execution statistics from Excel results             |
-| `testpilot archive [name]`                  | `test:archive`  | `/test:archive`  | Archive the full test artifact chain for traceability        |
-| `testpilot list`                            | —               | —                | List active and archived changes                             |
-| `testpilot --help`                          | —               | —                | Display help information                                     |
-| `testpilot --version`                       | —               | —                | Display version                                              |
+| CLI command                                | Workflow label  | Slash command    | Description                                                      |
+| ------------------------------------------ | --------------- | ---------------- | ---------------------------------------------------------------- |
+| `testspec init`                            | —               | —                | Initialize project with AI agent integrations                    |
+| `testspec new <name> --requirement <path>` | `test:new`      | `/test:new`      | Create a test proposal workspace from a requirement document     |
+| `testspec analysis [name]`                 | `test:analysis` | `/test:analysis` | Decompose requirements into testable items, risks, and questions |
+| `testspec points [name]`                   | `test:points`   | `/test:points`   | Generate core scenario test points for a test change             |
+| `testspec excel [name]`                    | `test:excel`    | `/test:excel`    | Export executable Excel test cases                               |
+| `testspec mind [name]`                     | `test:mind`     | `/test:mind`     | Export mind-map style test cases for review                      |
+| `testspec report [name]`                   | `test:report`   | `/test:report`   | Generate execution statistics from Excel results                 |
+| `testspec archive [name]`                  | `test:archive`  | `/test:archive`  | Archive the full test artifact chain for traceability            |
+| `testspec list`                            | —               | —                | List active and archived changes                                 |
+| `testspec --help`                          | —               | —                | Display help information                                         |
+| `testspec --version`                       | —               | —                | Display version                                                  |
 
-When a command accepts `[name]`, TestPilot uses the explicit name if provided. If omitted, it infers the only active change; when multiple exist, it prompts for an explicit name.
+When a command accepts `[name]`, TestSpec uses the explicit name if provided. If omitted, it infers the only active change; when multiple exist, it prompts for an explicit name.
 
 ## Excel Export
 
-`testpilot excel [name]` exports `artifacts/<name>_cases.xlsx` with two worksheets:
+`testspec excel [name]` exports `artifacts/<name>_cases.xlsx` with two worksheets:
 
 | Worksheet  | Purpose                                                                                                               |
 | ---------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -131,7 +131,7 @@ your-project/
 ├── .claude/commands/test/    # Claude Code slash commands (if selected)
 ├── .qoder/commands/test/     # Qoder commands (if selected)
 ├── AGENTS.md                 # Generic agent guidance (if selected)
-└── testpilot/
+└── testspec/
     ├── changes/
     │   ├── login-v2/         # Active test change
     │   │   ├── proposal.md              # Test proposal
@@ -153,7 +153,7 @@ your-project/
 
 ## Using with AI Agents
 
-After `testpilot init`, AI agents can use workflow labels directly:
+After `testspec init`, AI agents can use workflow labels directly:
 
 **Claude Code:**
 
@@ -168,7 +168,7 @@ After `testpilot init`, AI agents can use workflow labels directly:
 ```
 
 **Codex / Generic Agents:**
-Reads `AGENTS.md` and maps `test:*` labels to `testpilot` CLI commands.
+Reads `AGENTS.md` and maps `test:*` labels to `testspec` CLI commands.
 
 The `test:*` labels are Agent workflow labels, not shell commands.
 

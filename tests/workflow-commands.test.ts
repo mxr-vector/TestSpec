@@ -9,7 +9,7 @@ let tempDir: string;
 
 beforeEach(async () => {
   originalCwd = process.cwd();
-  tempDir = await mkdtemp(join(tmpdir(), "testpilot-"));
+  tempDir = await mkdtemp(join(tmpdir(), "testspec-"));
   process.chdir(tempDir);
 });
 
@@ -70,15 +70,15 @@ describe("workflow command actions", () => {
     await program.parseAsync(["points", "login-v2"], { from: "user" });
 
     const proposal = await readFile(
-      join(tempDir, "testpilot", "changes", "login-v2", "proposal.md"),
+      join(tempDir, "testspec", "changes", "login-v2", "proposal.md"),
       "utf8"
     );
     const analysis = await readFile(
-      join(tempDir, "testpilot", "changes", "login-v2", "requirements-analysis.md"),
+      join(tempDir, "testspec", "changes", "login-v2", "requirements-analysis.md"),
       "utf8"
     );
     const points = await readFile(
-      join(tempDir, "testpilot", "changes", "login-v2", "specs", "testpoints.md"),
+      join(tempDir, "testspec", "changes", "login-v2", "specs", "testpoints.md"),
       "utf8"
     );
 

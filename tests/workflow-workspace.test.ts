@@ -2,7 +2,7 @@ import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { TestPilotError } from "../src/core/errors.js";
+import { TestSpecError } from "../src/core/errors.js";
 import { normalizeChangeName } from "../src/workflow/names.js";
 import {
   buildChangeWorkspace,
@@ -15,7 +15,7 @@ let tempDir: string;
 
 beforeEach(async () => {
   originalCwd = process.cwd();
-  tempDir = await mkdtemp(join(tmpdir(), "testpilot-"));
+  tempDir = await mkdtemp(join(tmpdir(), "testspec-"));
   process.chdir(tempDir);
 });
 
@@ -30,7 +30,7 @@ describe("normalizeChangeName", () => {
   });
 
   it("rejects empty names", () => {
-    expect(() => normalizeChangeName("!!!")).toThrow(TestPilotError);
+    expect(() => normalizeChangeName("!!!")).toThrow(TestSpecError);
   });
 });
 
@@ -40,7 +40,7 @@ describe("change workspace", () => {
 
     expect(workspace.name).toBe("login-v2");
     await expect(mkdir(workspace.specsDir)).rejects.toThrow();
-    await expect(createChangeWorkspace("login-v2")).rejects.toThrow(TestPilotError);
+    await expect(createChangeWorkspace("login-v2")).rejects.toThrow(TestSpecError);
   });
 
   it("resolves explicit and single active changes", async () => {
@@ -57,9 +57,9 @@ describe("change workspace", () => {
     await expect(resolveChangeWorkspace()).rejects.toThrow(/Multiple active test changes/);
   });
 
-  it("builds paths under testpilot changes", () => {
+  it("builds paths under testspec changes", () => {
     const workspace = buildChangeWorkspace("login-v2");
 
-    expect(workspace.changeDir.endsWith(join("testpilot", "changes", "login-v2"))).toBe(true);
+    expect(workspace.changeDir.endsWith(join("testspec", "changes", "login-v2"))).toBe(true);
   });
 });

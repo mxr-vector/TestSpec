@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { TestPilotError } from "../src/core/errors.js";
+import { TestSpecError } from "../src/core/errors.js";
 import { logError, logInfo, logSuccess } from "../src/core/logger.js";
 import { resolveFromCwd } from "../src/core/paths.js";
 import { getPackageInfo } from "../src/utils/package-info.js";
@@ -30,12 +30,12 @@ describe("resolveFromCwd", () => {
   });
 });
 
-describe("TestPilotError", () => {
+describe("TestSpecError", () => {
   it("preserves the message and custom error name", () => {
-    const error = new TestPilotError("Something failed");
+    const error = new TestSpecError("Something failed");
 
     expect(error).toBeInstanceOf(Error);
-    expect(error.name).toBe("TestPilotError");
+    expect(error.name).toBe("TestSpecError");
     expect(error.message).toBe("Something failed");
   });
 });

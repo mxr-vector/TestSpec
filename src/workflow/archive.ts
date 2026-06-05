@@ -1,6 +1,6 @@
 import { cp, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { basename, join, relative } from "node:path";
-import { TestPilotError } from "../core/errors.js";
+import { TestSpecError } from "../core/errors.js";
 import { readReportSummary } from "./report.js";
 import type { ChangeWorkspace } from "./workspace.js";
 import { getArchiveRoot, pathExists } from "./workspace.js";
@@ -22,7 +22,7 @@ export async function archiveChange(
   const targetDir = join(archiveRoot, `${date}-${workspace.name}`);
 
   if (await pathExists(targetDir)) {
-    throw new TestPilotError(
+    throw new TestSpecError(
       `Archive already exists: ${basename(targetDir)}. Refusing to overwrite.`
     );
   }

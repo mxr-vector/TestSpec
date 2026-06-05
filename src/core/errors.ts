@@ -1,6 +1,6 @@
-export class TestPilotError extends Error {
+export class TestSpecError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "TestPilotError";
+    this.name = "TestSpecError";
   }
 }

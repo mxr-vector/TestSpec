@@ -1,9 +1,9 @@
 import { access, mkdir, readdir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { TestPilotError } from "../core/errors.js";
+import { TestSpecError } from "../core/errors.js";
 import { normalizeChangeName } from "./names.js";
 
-export const WORKSPACE_ROOT = "testpilot";
+export const WORKSPACE_ROOT = "testspec";
 export const CHANGES_DIR = "changes";
 export const ARCHIVE_DIR = "archive";
 
@@ -74,7 +74,7 @@ export async function resolveChangeWorkspace(
     const workspace = buildChangeWorkspace(name, cwd);
 
     if (!(await pathExists(workspace.changeDir))) {
-      throw new TestPilotError(`Test change not found: ${workspace.name}`);
+      throw new TestSpecError(`Test change not found: ${workspace.name}`);
     }
 
     return workspace;
@@ -83,21 +83,21 @@ export async function resolveChangeWorkspace(
   const activeChanges = await listActiveChanges(cwd);
 
   if (activeChanges.length === 0) {
-    throw new TestPilotError(
-      "No active test changes found. Create one with `testpilot new <name>`."
+    throw new TestSpecError(
+      "No active test changes found. Create one with `testspec new <name>`."
     );
   }
 
   if (activeChanges.length > 1) {
-    throw new TestPilotError(
+    throw new TestSpecError(
       `Multiple active test changes found: ${activeChanges.join(", ")}. Specify a change name.`
     );
   }
 
   const inferredName = activeChanges[0];
   if (!inferredName) {
-    throw new TestPilotError(
-      "No active test changes found. Create one with `testpilot new <name>`."
+    throw new TestSpecError(
+      "No active test changes found. Create one with `testspec new <name>`."
     );
   }
 
@@ -111,7 +111,7 @@ export async function createChangeWorkspace(
   const workspace = buildChangeWorkspace(name, options.cwd);
 
   if ((await pathExists(workspace.changeDir)) && !options.force) {
-    throw new TestPilotError(
+    throw new TestSpecError(
       `Test change already exists: ${workspace.name}. Refusing to overwrite existing artifacts.`
     );
   }
@@ -126,13 +126,13 @@ export async function assertDirectory(path: string, message: string): Promise<vo
   try {
     const info = await stat(path);
     if (!info.isDirectory()) {
-      throw new TestPilotError(message);
+      throw new TestSpecError(message);
     }
   } catch (error) {
-    if (error instanceof TestPilotError) {
+    if (error instanceof TestSpecError) {
       throw error;
     }
-    throw new TestPilotError(message);
+    throw new TestSpecError(message);
   }
 }
 

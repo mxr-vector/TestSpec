@@ -26,7 +26,7 @@ let tempDir: string;
 
 beforeEach(async () => {
   originalCwd = process.cwd();
-  tempDir = await mkdtemp(join(tmpdir(), "testpilot-"));
+  tempDir = await mkdtemp(join(tmpdir(), "testspec-"));
   process.chdir(tempDir);
 });
 
@@ -311,7 +311,7 @@ describe("archive", () => {
     };
 
     expect(
-      archivePath.endsWith(join("testpilot", "changes", "archive", "2026-06-04-login-v2"))
+      archivePath.endsWith(join("testspec", "changes", "archive", "2026-06-04-login-v2"))
     ).toBe(true);
     expect(manifest.name).toBe("login-v2");
     expect(manifest.requirement).toBe("docs/login.md");

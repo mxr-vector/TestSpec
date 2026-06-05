@@ -1,4 +1,4 @@
-import { TestPilotError } from "../core/errors.js";
+import { TestSpecError } from "../core/errors.js";
 
 export function normalizeChangeName(input: string): string {
   const normalized = input
@@ -11,7 +11,7 @@ export function normalizeChangeName(input: string): string {
     .replace(/^[-_.]+|[-_.]+$/g, "");
 
   if (normalized.length === 0) {
-    throw new TestPilotError("Change name must contain at least one letter or number.");
+    throw new TestSpecError("Change name must contain at least one letter or number.");
   }
 
   return normalized;

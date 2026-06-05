@@ -79,8 +79,8 @@ export async function writeProposal(
       "",
       "## 后续步骤",
       "",
-      "- 运行 `testpilot analysis` 生成需求分析。",
-      "- 运行 `testpilot points` 生成测试点。",
+      "- 运行 `testspec analysis` 生成需求分析。",
+      "- 运行 `testspec points` 生成测试点。",
     ].join("\n")
   );
 

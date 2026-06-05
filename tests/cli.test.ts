@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { createProgram } from "../src/cli.js";
 
 describe("createProgram", () => {
-  it("creates the testpilot CLI program", () => {
+  it("creates the testspec CLI program", () => {
     const program = createProgram();
 
-    expect(program.name()).toBe("testpilot");
+    expect(program.name()).toBe("testspec");
     const commandNames = program.commands.map((command) => command.name());
 
     expect(commandNames).toContain("init");

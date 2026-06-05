@@ -60,7 +60,7 @@ function manifestXml(): string {
 }
 
 function metaXml(): string {
-  return `<?xml version="1.0" encoding="UTF-8"?><meta xmlns="urn:xmind:xmap:xmlns:meta:2.0"><Creator><Name>TestPilot</Name></Creator></meta>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><meta xmlns="urn:xmind:xmap:xmlns:meta:2.0"><Creator><Name>TestSpec</Name></Creator></meta>`;
 }
 
 function stylesXml(): string {

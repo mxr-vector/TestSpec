@@ -8,7 +8,7 @@ import { createProgram } from "../src/cli.js";
 import { registerInitCommand } from "../src/commands/init.js";
 import {
   createAgentSelectionItems,
-  initializeTestPilot,
+  initializeTestSpec,
   parseAgentSelection,
   promptAgentSelection,
   selectedAgentIds,
@@ -21,7 +21,7 @@ let tempDir: string;
 
 beforeEach(async () => {
   originalCwd = process.cwd();
-  tempDir = await mkdtemp(join(tmpdir(), "testpilot-init-"));
+  tempDir = await mkdtemp(join(tmpdir(), "testspec-init-"));
   process.chdir(tempDir);
 });
 
@@ -40,7 +40,7 @@ describe("registerInitCommand", () => {
 
     expect(initCommand).toBeDefined();
     expect(initCommand?.description()).toBe(
-      "Initialize a TestPilot workspace in the current project"
+      "Initialize a TestSpec workspace in the current project"
     );
     expect(initCommand?.options.some((option) => option.long === "--agents")).toBe(true);
     expect(initCommand?.options.some((option) => option.long === "--force")).toBe(true);
@@ -53,29 +53,29 @@ describe("registerInitCommand", () => {
     await program.parseAsync(["init", "--agents", "claude"], { from: "user" });
 
     expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Initialized TestPilot workspace.")
+      expect.stringContaining("Initialized TestSpec workspace.")
     );
-    await expect(stat(join(tempDir, "testpilot", "changes", "archive"))).resolves.toMatchObject({});
+    await expect(stat(join(tempDir, "testspec", "changes", "archive"))).resolves.toMatchObject({});
   });
 });
 
-describe("initializeTestPilot", () => {
+describe("initializeTestSpec", () => {
   it("creates workspace directories", async () => {
-    await initializeTestPilot({ agents: "claude" });
+    await initializeTestSpec({ agents: "claude" });
 
-    const changes = await stat(join(tempDir, "testpilot", "changes"));
-    const archive = await stat(join(tempDir, "testpilot", "changes", "archive"));
+    const changes = await stat(join(tempDir, "testspec", "changes"));
+    const archive = await stat(join(tempDir, "testspec", "changes", "archive"));
 
     expect(changes.isDirectory()).toBe(true);
     expect(archive.isDirectory()).toBe(true);
   });
 
   it("generates only selected non-interactive agent integrations", async () => {
-    await initializeTestPilot({ agents: "qoder" });
+    await initializeTestSpec({ agents: "qoder" });
 
     await expect(
       readFile(join(tempDir, ".qoder", "commands", "test", "new.md"), "utf8")
-    ).resolves.toContain("testpilot new <name> --requirement <path>");
+    ).resolves.toContain("testspec new <name> --requirement <path>");
     await expect(
       readFile(join(tempDir, ".claude", "commands", "test", "new.md"), "utf8")
     ).rejects.toThrow();
@@ -83,7 +83,7 @@ describe("initializeTestPilot", () => {
   });
 
   it("generates all Claude Code workflow command files", async () => {
-    await initializeTestPilot({ agents: "claude" });
+    await initializeTestSpec({ agents: "claude" });
 
     for (const command of WORKFLOW_COMMANDS) {
       const content = await readFile(
@@ -98,7 +98,7 @@ describe("initializeTestPilot", () => {
   });
 
   it("generates all Qoder workflow command files", async () => {
-    await initializeTestPilot({ agents: "qoder" });
+    await initializeTestSpec({ agents: "qoder" });
 
     for (const command of WORKFLOW_COMMANDS) {
       const content = await readFile(
@@ -115,28 +115,28 @@ describe("initializeTestPilot", () => {
   it("creates AGENTS.md for Codex and preserves existing project guidance", async () => {
     await writeFile(join(tempDir, "AGENTS.md"), "# Existing Guidance\n\nKeep this.\n");
 
-    await initializeTestPilot({ agents: "codex" });
+    await initializeTestSpec({ agents: "codex" });
     const content = await readFile(join(tempDir, "AGENTS.md"), "utf8");
 
     expect(content).toContain("# Existing Guidance");
     expect(content).toContain("Keep this.");
     expect(content).toContain("BEGIN TESTPILOT AGENT WORKFLOW");
     expect(content).toContain("test:new");
-    expect(content).toContain("testpilot new <name> --requirement <path>");
+    expect(content).toContain("testspec new <name> --requirement <path>");
   });
 
   it("creates AGENTS.md for generic agent guidance", async () => {
-    await initializeTestPilot({ agents: "generic" });
+    await initializeTestSpec({ agents: "generic" });
 
     const content = await readFile(join(tempDir, "AGENTS.md"), "utf8");
 
     expect(content).toContain("BEGIN TESTPILOT AGENT WORKFLOW");
     expect(content).toContain("Generic Agent guidance");
-    expect(content).toContain("testpilot new <name> --requirement <path>");
+    expect(content).toContain("testspec new <name> --requirement <path>");
   });
 
   it("initializes all built-in agents", async () => {
-    await initializeTestPilot({ agents: "all" });
+    await initializeTestSpec({ agents: "all" });
 
     await expect(
       readFile(join(tempDir, ".claude", "commands", "test", "new.md"), "utf8")
@@ -149,37 +149,37 @@ describe("initializeTestPilot", () => {
     );
   });
 
-  it("preserves existing TestPilot AGENTS.md section unless force is provided", async () => {
-    await initializeTestPilot({ agents: "codex" });
+  it("preserves existing TestSpec AGENTS.md section unless force is provided", async () => {
+    await initializeTestSpec({ agents: "codex" });
     await writeFile(
       join(tempDir, "AGENTS.md"),
       [
         "# Existing Guidance",
         "",
         "<!-- BEGIN TESTPILOT AGENT WORKFLOW -->",
-        "custom TestPilot section",
+        "custom TestSpec section",
         "<!-- END TESTPILOT AGENT WORKFLOW -->",
         "",
         "Keep this.",
       ].join("\n")
     );
 
-    const first = await initializeTestPilot({ agents: "generic" });
+    const first = await initializeTestSpec({ agents: "generic" });
     expect(first.preserved.some((path) => path.endsWith("AGENTS.md"))).toBe(true);
     await expect(readFile(join(tempDir, "AGENTS.md"), "utf8")).resolves.toContain(
-      "custom TestPilot section"
+      "custom TestSpec section"
     );
 
-    await initializeTestPilot({ agents: "generic", force: true });
+    await initializeTestSpec({ agents: "generic", force: true });
     const content = await readFile(join(tempDir, "AGENTS.md"), "utf8");
-    expect(content).not.toContain("custom TestPilot section");
+    expect(content).not.toContain("custom TestSpec section");
     expect(content).toContain("Generic Agent guidance");
     expect(content).toContain("Keep this.");
   });
 
   it("is idempotent and refreshes generated command files", async () => {
-    await initializeTestPilot({ agents: "claude,codex" });
-    const second = await initializeTestPilot({ agents: "claude,codex" });
+    await initializeTestSpec({ agents: "claude,codex" });
+    const second = await initializeTestSpec({ agents: "claude,codex" });
 
     expect(second.refreshed.length).toBeGreaterThan(0);
     expect(second.preserved.some((path) => path.endsWith("AGENTS.md"))).toBe(true);
@@ -190,20 +190,20 @@ describe("initializeTestPilot", () => {
     await mkdir(join(tempDir, ".claude", "commands", "test"), { recursive: true });
     await writeFile(customPath, "custom command\n");
 
-    const first = await initializeTestPilot({ agents: "claude" });
+    const first = await initializeTestSpec({ agents: "claude" });
     expect(first.preserved.some((path) => path.endsWith(".claude/commands/test/new.md"))).toBe(
       true
     );
     await expect(readFile(customPath, "utf8")).resolves.toBe("custom command\n");
 
-    await initializeTestPilot({ agents: "claude", force: true });
+    await initializeTestSpec({ agents: "claude", force: true });
     await expect(readFile(customPath, "utf8")).resolves.toContain(
-      "testpilot new <name> --requirement <path>"
+      "testspec new <name> --requirement <path>"
     );
   });
 
   it("uses non-TTY defaults without hanging", async () => {
-    const result = await initializeTestPilot();
+    const result = await initializeTestSpec();
 
     expect(result.selectedAgents).toEqual(["claude", "codex"]);
     await expect(

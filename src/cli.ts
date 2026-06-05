@@ -8,7 +8,7 @@ export function createProgram(): Command {
   const program = new Command();
 
   program
-    .name("testpilot")
+    .name("testspec")
     .description("Requirement-driven test design CLI for AI-assisted QA workflows.")
     .version(packageInfo.version);
 
