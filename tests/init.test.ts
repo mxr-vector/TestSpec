@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PassThrough } from "node:stream";
 import { Command } from "commander";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../src/cli.js";
@@ -9,6 +10,7 @@ import {
   createAgentSelectionItems,
   initializeTestPilot,
   parseAgentSelection,
+  promptAgentSelection,
   selectedAgentIds,
   toggleAgentSelection,
   WORKFLOW_COMMANDS,
@@ -208,6 +210,30 @@ describe("initializeTestPilot", () => {
       readFile(join(tempDir, ".claude", "commands", "test", "new.md"), "utf8")
     ).resolves.toContain("/test:new");
     await expect(readFile(join(tempDir, "AGENTS.md"), "utf8")).resolves.toContain("Codex");
+  });
+
+  it("pauses interactive input again after confirming selection", async () => {
+    type InteractiveInput = PassThrough & {
+      isRaw: boolean;
+      isTTY: boolean;
+      setRawMode: (mode: boolean) => InteractiveInput;
+    };
+    const input = new PassThrough() as InteractiveInput;
+    const output = new PassThrough() as unknown as NodeJS.WriteStream;
+    input.isTTY = true;
+    input.isRaw = false;
+    input.setRawMode = (mode: boolean) => {
+      input.isRaw = mode;
+      return input;
+    };
+    input.pause();
+
+    const selection = promptAgentSelection(input as unknown as NodeJS.ReadStream, output);
+    input.write("\r");
+
+    await expect(selection).resolves.toEqual(["claude", "codex"]);
+    expect(input.isPaused()).toBe(true);
+    expect(input.isRaw).toBe(false);
   });
 });
 

@@ -274,13 +274,13 @@ export async function promptAgentSelection(
     const onData = (data: Buffer): void => {
       const key = data.toString("utf8");
 
-      if (key === "") {
+      if (key.includes("")) {
         cleanup();
         reject(new TestPilotError("TestPilot init cancelled."));
         return;
       }
 
-      if (key === "\r" || key === "\n") {
+      if (key.includes("\r") || key.includes("\n")) {
         const selected = selectedAgentIds(items);
         cleanup();
         writeStream.write(`Selected: ${formatAgentNames(selected)}\n`);
@@ -309,6 +309,9 @@ export async function promptAgentSelection(
     function cleanup(): void {
       readStream.off("data", onData);
       readStream.setRawMode(wasRaw);
+      if (readStream.listenerCount("data") === 0) {
+        readStream.pause();
+      }
       writeStream.write("\n");
     }
 
