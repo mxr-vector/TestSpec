@@ -1,4 +1,4 @@
-# TestPilot
+# TestSpec
 
 > [English Documentation](./README.md)
 

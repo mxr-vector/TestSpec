@@ -1,4 +1,4 @@
-# TestPilot
+# TestSpec
 
 > [中文文档](./README-CN.md)
 
