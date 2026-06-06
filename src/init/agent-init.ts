@@ -79,7 +79,7 @@ export const WORKFLOW_COMMANDS = [
 ] as const;
 
 export type WorkflowCommand = (typeof WORKFLOW_COMMANDS)[number];
-export type AgentId = "claude" | "qoder" | "codex" | "generic";
+export type AgentId = "claude" | "codex" | "qoder" | "trae" | "generic";
 
 export const PROVIDER_NEUTRAL_PROMPT_RULES = [
   "The coding agent performs semantic generation; the TestSpec CLI remains provider-free and deterministic.",
@@ -106,16 +106,22 @@ export const AGENT_INTEGRATIONS: AgentIntegration[] = [
     defaultSelected: true,
   },
   {
-    id: "qoder",
-    displayName: "Qoder",
-    description: "Generate .qoder command files for the /test:* workflow.",
-    defaultSelected: false,
-  },
-  {
     id: "codex",
     displayName: "Codex",
     description: "Update AGENTS.md with Codex-friendly TestSpec workflow guidance.",
+    defaultSelected: false,
+  },
+  {
+    id: "qoder",
+    displayName: "Qoder",
+    description: "Generate .qoder command files for the /test:* workflow.",
     defaultSelected: true,
+  },
+  {
+    id: "trae",
+    displayName: "Trae",
+    description: "Generate .trae command files for the /test:* workflow.",
+    defaultSelected: false,
   },
   {
     id: "generic",
@@ -228,7 +234,7 @@ export async function initializeTestSpec(options: InitOptions = {}): Promise<Ini
     removed: [],
   };
 
-  const removedCommandFiles = await cleanupGeneratedCommandFiles(cwd);
+  const removedCommandFiles = await cleanupGeneratedCommandFiles(cwd, selectedAgents);
   const removedCommandFileSet = new Set(removedCommandFiles);
   result.removed.push(...removedCommandFiles);
 
@@ -245,6 +251,10 @@ export async function initializeTestSpec(options: InitOptions = {}): Promise<Ini
 
   if (selectedAgents.includes("qoder")) {
     await writeCommandFiles(cwd, ".qoder", options.force === true, removedCommandFileSet, result);
+  }
+
+  if (selectedAgents.includes("trae")) {
+    await writeCommandFiles(cwd, ".trae", options.force === true, removedCommandFileSet, result);
   }
 
   if (selectedAgents.includes("codex") || selectedAgents.includes("generic")) {
@@ -354,10 +364,14 @@ function isInteractiveInput(input: NodeJS.ReadStream): input is ReadStream {
   return input.isTTY === true && typeof (input as ReadStream).setRawMode === "function";
 }
 
-async function cleanupGeneratedCommandFiles(cwd: string): Promise<string[]> {
+async function cleanupGeneratedCommandFiles(
+  cwd: string,
+  selectedAgents: readonly AgentId[]
+): Promise<string[]> {
   const removed: string[] = [];
+  const selectedCommandRoots = commandRootsForAgents(selectedAgents);
 
-  for (const rootDir of [".claude", ".qoder"] as const) {
+  for (const rootDir of selectedCommandRoots) {
     const commandDir = join(cwd, rootDir, "commands", "test");
     let entries: Dirent<string>[];
     try {
@@ -395,9 +409,25 @@ async function cleanupGeneratedCommandFiles(cwd: string): Promise<string[]> {
   return removed;
 }
 
+function commandRootsForAgents(
+  selectedAgents: readonly AgentId[]
+): Array<".claude" | ".qoder" | ".trae"> {
+  const roots: Array<".claude" | ".qoder" | ".trae"> = [];
+  if (selectedAgents.includes("claude")) {
+    roots.push(".claude");
+  }
+  if (selectedAgents.includes("qoder")) {
+    roots.push(".qoder");
+  }
+  if (selectedAgents.includes("trae")) {
+    roots.push(".trae");
+  }
+  return roots;
+}
+
 async function writeCommandFiles(
   cwd: string,
-  rootDir: ".claude" | ".qoder",
+  rootDir: ".claude" | ".qoder" | ".trae",
   force: boolean,
   removedCommandFileSet: ReadonlySet<string>,
   result: InitResult
@@ -480,6 +510,8 @@ function renderCommandFile(command: WorkflowCommand): string {
     GENERATED_FILE_MARKER,
     "",
     `# ${command.slashCommand}`,
+    "",
+    `Brief: ${command.description}`,
     "",
     `Treat \`${command.slashCommand}\` as the Agent workflow label \`${command.label}\` for TestSpec.`,
     "",
@@ -583,7 +615,7 @@ function renderAgentsSection(selectedAgents: readonly AgentId[]): string {
     "",
     `Configured integrations: ${agentNames}.`,
     "",
-    "TestSpec uses agent-executed generation and CLI-managed validation/export. Claude Code, Codex, Qoder, or another coding agent should generate semantic artifacts from requirements; the `testspec` CLI remains provider-free and deterministic.",
+    "TestSpec uses agent-executed generation and CLI-managed validation/export. Claude Code, Codex, Qoder, Trae, or another coding agent should generate semantic artifacts from requirements; the `testspec` CLI remains provider-free and deterministic.",
     "",
     "Provider-neutral generation rules:",
     "",

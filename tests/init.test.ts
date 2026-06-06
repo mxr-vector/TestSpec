@@ -94,6 +94,7 @@ describe("initializeTestSpec", () => {
       expect(content).toContain(command.label);
       expect(content).toContain(command.backingCommand);
       expect(content).toContain("Provider-neutral generation rules");
+      expect(content).toContain(`Brief: ${command.description}`);
       expect(content).toContain("User arguments: $ARGUMENTS");
       expect(content).toContain("argument-hint:");
       expect(content).not.toContain("category: TestSpec");
@@ -118,7 +119,9 @@ describe("initializeTestSpec", () => {
     expect(analysis).toContain("Generate `requirements-analysis.md` with requirement IDs");
     expect(points).toContain("Generate `specs/testpoints.md` with stable `TP-xxx` IDs");
     expect(excel).toContain("Generate or update `artifacts/testcases.json`");
-    expect(excel).toContain("using exactly this schema: `title`, `module`, `type`, `priority`, `preconditions`, `steps`, `expectedResult`");
+    expect(excel).toContain(
+      "using exactly this schema: `title`, `module`, `type`, `priority`, `preconditions`, `steps`, `expectedResult`"
+    );
     expect(excel).toContain("Run `testspec validate [name]`");
     expect(excel).not.toContain("Do not generate verbose/runtime fields");
     expect(excel).not.toContain("caseId");
@@ -137,6 +140,7 @@ describe("initializeTestSpec", () => {
       expect(content).toContain(command.slashCommand);
       expect(content).toContain(command.label);
       expect(content).toContain(command.backingCommand);
+      expect(content).toContain(`Brief: ${command.description}`);
     }
   });
 
@@ -167,6 +171,23 @@ describe("initializeTestSpec", () => {
     expect(content).toContain("testspec new <name> --requirement <path>");
   });
 
+  it("generates all Trae workflow command files", async () => {
+    await initializeTestSpec({ agents: "trae" });
+
+    for (const command of WORKFLOW_COMMANDS) {
+      const content = await readFile(
+        join(tempDir, ".trae", "commands", "test", `${command.id}.md`),
+        "utf8"
+      );
+
+      expect(content).toContain(command.slashCommand);
+      expect(content).toContain(command.label);
+      expect(content).toContain(command.backingCommand);
+      expect(content).toContain(`Brief: ${command.description}`);
+      expect(content).toContain("User arguments: $ARGUMENTS");
+    }
+  });
+
   it("initializes all built-in agents", async () => {
     await initializeTestSpec({ agents: "all" });
 
@@ -176,6 +197,10 @@ describe("initializeTestSpec", () => {
     await expect(
       readFile(join(tempDir, ".qoder", "commands", "test", "new.md"), "utf8")
     ).resolves.toContain("/test:new");
+    await expect(
+      readFile(join(tempDir, ".trae", "commands", "test", "new.md"), "utf8")
+    ).resolves.toContain("/test:new");
+    await expect(readFile(join(tempDir, "AGENTS.md"), "utf8")).resolves.toContain("Codex");
     await expect(readFile(join(tempDir, "AGENTS.md"), "utf8")).resolves.toContain(
       "Generic Agent guidance"
     );
@@ -196,16 +221,16 @@ describe("initializeTestSpec", () => {
       ].join("\n")
     );
 
-    const first = await initializeTestSpec({ agents: "generic" });
+    const first = await initializeTestSpec({ agents: "codex" });
     expect(first.preserved.some((path) => path.endsWith("AGENTS.md"))).toBe(true);
     await expect(readFile(join(tempDir, "AGENTS.md"), "utf8")).resolves.toContain(
       "custom TestSpec section"
     );
 
-    await initializeTestSpec({ agents: "generic", force: true });
+    await initializeTestSpec({ agents: "codex", force: true });
     const content = await readFile(join(tempDir, "AGENTS.md"), "utf8");
     expect(content).not.toContain("custom TestSpec section");
-    expect(content).toContain("Generic Agent guidance");
+    expect(content).toContain("Codex");
     expect(content).toContain("Keep this.");
   });
 
@@ -255,7 +280,7 @@ describe("initializeTestSpec", () => {
     );
   });
 
-  it("removes generated command files for integrations omitted from the current selection", async () => {
+  it("does not remove generated command files for integrations omitted from the current selection", async () => {
     const qoderCommandDir = join(tempDir, ".qoder", "commands", "test");
     const stalePath = join(qoderCommandDir, "excel.md");
     await mkdir(qoderCommandDir, { recursive: true });
@@ -265,19 +290,22 @@ describe("initializeTestSpec", () => {
 
     expect(
       result.removed.some((path) => path.endsWith(join(".qoder", "commands", "test", "excel.md")))
-    ).toBe(true);
-    await expect(readFile(stalePath, "utf8")).rejects.toThrow();
+    ).toBe(false);
+    await expect(readFile(stalePath, "utf8")).resolves.toContain("# /test:excel");
     await expect(readFile(join(qoderCommandDir, "new.md"), "utf8")).rejects.toThrow();
   });
 
   it("uses non-TTY defaults without hanging", async () => {
     const result = await initializeTestSpec();
 
-    expect(result.selectedAgents).toEqual(["claude", "codex"]);
+    expect(result.selectedAgents).toEqual(["claude", "qoder"]);
     await expect(
       readFile(join(tempDir, ".claude", "commands", "test", "new.md"), "utf8")
     ).resolves.toContain("/test:new");
-    await expect(readFile(join(tempDir, "AGENTS.md"), "utf8")).resolves.toContain("Codex");
+    await expect(
+      readFile(join(tempDir, ".qoder", "commands", "test", "new.md"), "utf8")
+    ).resolves.toContain("/test:new");
+    await expect(readFile(join(tempDir, "AGENTS.md"), "utf8")).rejects.toThrow();
   });
 
   it("pauses interactive input again after confirming selection", async () => {
@@ -299,7 +327,7 @@ describe("initializeTestSpec", () => {
     const selection = promptAgentSelection(input as unknown as NodeJS.ReadStream, output);
     input.write("\r");
 
-    await expect(selection).resolves.toEqual(["claude", "codex"]);
+    await expect(selection).resolves.toEqual(["claude", "qoder"]);
     expect(input.isPaused()).toBe(true);
     expect(input.isRaw).toBe(false);
   });
@@ -307,8 +335,14 @@ describe("initializeTestSpec", () => {
 
 describe("agent selection helpers", () => {
   it("parses non-interactive agent selections", () => {
-    expect(parseAgentSelection("claude,qoder,codex")).toEqual(["claude", "qoder", "codex"]);
-    expect(parseAgentSelection("all")).toEqual(["claude", "qoder", "codex", "generic"]);
+    expect(parseAgentSelection("claude,qoder,codex,trae,generic")).toEqual([
+      "claude",
+      "qoder",
+      "codex",
+      "trae",
+      "generic",
+    ]);
+    expect(parseAgentSelection("all")).toEqual(["claude", "codex", "qoder", "trae", "generic"]);
     expect(() => parseAgentSelection("unknown")).toThrow("Unknown agent");
   });
 
@@ -316,7 +350,7 @@ describe("agent selection helpers", () => {
     const items = createAgentSelectionItems(["claude"]);
 
     expect(selectedAgentIds(items)).toEqual(["claude"]);
-    expect(selectedAgentIds(toggleAgentSelection(items, 1))).toEqual(["claude", "qoder"]);
+    expect(selectedAgentIds(toggleAgentSelection(items, 2))).toEqual(["claude", "qoder"]);
     expect(selectedAgentIds(toggleAgentSelection(items, 0))).toEqual([]);
   });
 });

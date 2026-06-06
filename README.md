@@ -4,12 +4,12 @@
 
 Requirement-driven test design CLI for AI-assisted QA workflows.
 
-TestSpec is a CLI tool that helps QA teams create, manage, and track test artifacts through a structured workflow. It integrates with AI-powered agents like Claude Code, Qoder, and Codex to streamline the testing process.
+TestSpec is a CLI tool that helps QA teams create, manage, and track test artifacts through a structured workflow. It integrates with AI-powered agents like Claude Code, Qoder, Codex, and Trae to streamline the testing process.
 
 ## Features
 
 - **Structured Workflow**: Follow a proven test design process from requirements to test cases
-- **AI Integration**: Works with Claude Code, Qoder, Codex, and other AI agents
+- **AI Integration**: Works with Claude Code, Qoder, Codex, Trae, and other AI agents
 - **Excel Export**: Generate executable test cases with functional and performance worksheets
 - **Mind Map Export**: Create visual test case maps for review and collaboration
 - **Traceability**: Maintain links between requirements, test points, and test cases
@@ -36,21 +36,22 @@ npx @wangjh2001/testspec new <test-name> --requirement <path>
 testspec init
 ```
 
-This sets up the TestSpec workspace and configures AI agent integrations. By default, the interactive selection starts with Claude Code and Codex selected. Use Space to select/deselect integrations and Enter to confirm. Before regenerating agent command files, init removes stale TestSpec-generated `.claude/commands/test/*.md` and `.qoder/commands/test/*.md` files that still contain the generated marker; custom command files without the marker are preserved. Command files with the generated marker are treated as TestSpec-managed and may be deleted/recreated by `testspec init`.
+This sets up the TestSpec workspace and configures AI agent integrations. By default, the interactive selection starts with Claude Code and Qoder selected. Use Space to select/deselect integrations and Enter to confirm. Before regenerating selected agent command files, init removes stale TestSpec-generated command files in the selected `.claude/commands/test/`, `.qoder/commands/test/`, or `.trae/commands/test/` directories that still contain the generated marker; custom command files without the marker are preserved. Command files with the generated marker are treated as TestSpec-managed and may be deleted/recreated by `testspec init`.
 
 Available integrations:
 
 | Agent       | Output                                                       |
 | ----------- | ------------------------------------------------------------ |
 | Claude Code | `.claude/commands/test/*.md` for `/test:*` slash commands    |
-| Qoder       | `.qoder/commands/test/*.md` for the same workflow labels     |
 | Codex       | `AGENTS.md` guidance mapping `test:*` labels to CLI commands |
+| Qoder       | `.qoder/commands/test/*.md` for the same workflow labels     |
+| Trae        | `.trae/commands/test/*.md` for the same workflow labels      |
 | Generic     | Tool-agnostic `AGENTS.md` workflow guidance                  |
 
 For non-interactive setup:
 
 ```bash
-testspec init --agents claude,qoder,codex
+testspec init --agents claude,qoder
 # or all integrations
 testspec init --agents all
 ```
@@ -65,7 +66,7 @@ This creates a new test change directory with a proposal template. `--requiremen
 
 ### 3. Run the Workflow
 
-For requirement-grounded generation, run the `test:*` labels inside Claude Code, Codex, Qoder, or another configured coding agent. The agent reads the requirement document and writes semantic artifacts; the CLI remains provider-free and handles validation, export, reporting, and archive.
+For requirement-grounded generation, run the `test:*` labels inside Claude Code, Codex, Qoder, Trae, or another configured coding agent. The agent reads the requirement document and writes semantic artifacts; the CLI remains provider-free and handles validation, export, reporting, and archive.
 
 ```text
 /test:analysis login-v2
@@ -114,7 +115,7 @@ testspec archive login-v2
 | `testspec --help`                                        | —               | —                | Display help information                                         |
 | `testspec --version`                                     | —               | —                | Display version                                                  |
 
-`--agents` accepts `claude`, `qoder`, `codex`, `generic`, or `all`; multiple agent IDs are comma-separated, for example `--agents claude,qoder,codex`. Use `--force` with `testspec init` to refresh existing TestSpec-generated agent command files, or with `testspec new` to overwrite an existing test change workspace.
+`--agents` accepts `claude`, `codex`, `qoder`, `trae`, `generic`, or `all`; multiple agent IDs are comma-separated, for example `--agents claude,qoder,trae`. Use `--force` with `testspec init` to refresh existing TestSpec-generated agent command files, or with `testspec new` to overwrite an existing test change workspace.
 
 When a command accepts `[name]`, TestSpec uses the explicit name if provided. If omitted, it infers the only active change; when multiple exist, it asks you to specify the change name.
 
@@ -147,7 +148,8 @@ After initialization and creating test changes, your project will have:
 your-project/
 ├── .claude/commands/test/    # Claude Code slash commands (if selected)
 ├── .qoder/commands/test/     # Qoder commands (if selected)
-├── AGENTS.md                 # Generic agent guidance (if selected)
+├── .trae/commands/test/      # Trae commands (if selected)
+├── AGENTS.md                 # Codex or generic agent guidance (if selected)
 └── testspec/
     ├── changes/
     │   ├── login-v2/         # Active test change
@@ -184,6 +186,9 @@ After `testspec init`, AI agents can use workflow labels directly:
 /test:report login-v2
 /test:archive login-v2
 ```
+
+**Qoder / Trae:**
+Use the same `/test:*` workflow labels from `.qoder/commands/test/*.md` or `.trae/commands/test/*.md`. These command files include the brief instruction, user arguments, and provider-neutral prompt-pack rules in the command body.
 
 **Codex / Generic Agents:**
 Read `AGENTS.md` for the same provider-neutral prompt-pack rules. Semantic labels such as `test:analysis`, `test:points`, and `test:excel` should read requirement evidence and generate artifacts before running deterministic CLI validation/export commands.

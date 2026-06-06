@@ -13,7 +13,7 @@ export function registerInitCommand(program: Command): void {
     .description("Initialize a TestSpec workspace in the current project")
     .option(
       "--agents <agents>",
-      "comma-separated agent integrations to initialize: claude,qoder,codex,generic, or all"
+      "comma-separated agent integrations to initialize: claude,codex,qoder,trae,generic, or all"
     )
     .option("-f, --force", "overwrite existing TestSpec-generated agent command files")
     .action(async (options: InitCommandOptions) => {
@@ -27,7 +27,7 @@ export function registerInitCommand(program: Command): void {
       logSuccess("Initialized TestSpec workspace.");
       logInfo(`Selected agents: ${result.selectedAgents.join(", ")}`);
       logInfo(`Workspace directories: ${result.directories.join(", ")}`);
-      logInfo("Cleaned generated command files from: .claude/commands/test, .qoder/commands/test.");
+      logInfo("Cleaned generated command files for selected command integrations.");
       logInfo(
         `Outputs: ${result.created.length} created, ${result.refreshed.length} refreshed, ${result.preserved.length} preserved, ${result.removed.length} removed.`
       );
