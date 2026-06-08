@@ -15,7 +15,8 @@ export async function writeXmind(path: string, title: string, cases: TestCase[])
 
 function contentXml(title: string, cases: TestCase[]): string {
   const grouped = groupCases(cases);
-  const modules = Object.entries(grouped)
+  const modules = [...Object.entries(grouped)]
+    .sort(([a], [b]) => a.localeCompare(b))
     .map(([module, byType], moduleIndex) => {
       const typeTopics = Object.entries(byType)
         .map(([type, items]) => {

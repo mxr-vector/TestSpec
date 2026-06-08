@@ -133,9 +133,10 @@ export async function readExecutionRows(path: string): Promise<ExecutionRow[]> {
 }
 
 function functionalRows(cases: WorkbookTestCase[]): string[][] {
+  const sorted = [...cases].sort((a, b) => a.module.localeCompare(b.module));
   return [
     [...FUNCTIONAL_EXCEL_HEADERS],
-    ...cases.map((testCase) => [
+    ...sorted.map((testCase) => [
       testCase.module,
       testCase.title,
       testCase.type,
@@ -149,9 +150,10 @@ function functionalRows(cases: WorkbookTestCase[]): string[][] {
 }
 
 function performanceRows(cases: PerformanceCase[]): string[][] {
+  const sorted = [...cases].sort((a, b) => a.module.localeCompare(b.module));
   return [
     [...PERFORMANCE_EXCEL_HEADERS],
-    ...cases.map((testCase) => [
+    ...sorted.map((testCase) => [
       testCase.module,
       testCase.scenarioName,
       testCase.performanceType,

@@ -125,7 +125,8 @@ export async function readReportSummary(workspaceDir: string): Promise<Partial<R
 }
 
 function renderReport(name: string, stats: ReportStats): string {
-  const moduleRows = Object.entries(stats.byModule)
+  const moduleRows = [...Object.entries(stats.byModule)]
+    .sort(([a], [b]) => a.localeCompare(b))
     .map(([moduleName, counts]) =>
       [moduleName, counts.通过, counts.失败, counts.阻塞, counts.未执行, counts.不适用].join(" | ")
     )
