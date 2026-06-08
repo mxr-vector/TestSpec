@@ -130,6 +130,7 @@ describe("structured cases and exports", () => {
     const workbookXml = strFromU8(workbookEntry(workbook, "xl/workbook.xml"));
     const relationshipsXml = strFromU8(workbookEntry(workbook, "xl/_rels/workbook.xml.rels"));
     const contentTypesXml = strFromU8(workbookEntry(workbook, "[Content_Types].xml"));
+    const stylesXml = strFromU8(workbookEntry(workbook, "xl/styles.xml"));
     const functionalSheetXml = strFromU8(workbookEntry(workbook, "xl/worksheets/sheet1.xml"));
     const performanceSheetXml = strFromU8(workbookEntry(workbook, "xl/worksheets/sheet2.xml"));
 
@@ -140,7 +141,18 @@ describe("structured cases and exports", () => {
     expect(workbookXml).toContain('name="性能测试"');
     expect(relationshipsXml).toContain('Target="worksheets/sheet1.xml"');
     expect(relationshipsXml).toContain('Target="worksheets/sheet2.xml"');
+    expect(relationshipsXml).toContain('Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"');
+    expect(relationshipsXml).toContain('Target="styles.xml"');
+    expect(contentTypesXml).toContain("/xl/styles.xml");
     expect(contentTypesXml).toContain("/xl/worksheets/sheet2.xml");
+    expect(stylesXml).toContain('rgb="FFFFFFFF"');
+    expect(stylesXml).toContain('rgb="FF1F4E78"');
+    expect(stylesXml).toContain('<alignment horizontal="center" vertical="center"/>');
+    expect(stylesXml).toContain('<left style="thin">');
+    expect(functionalSheetXml).toContain('<c r="A1" s="1" t="inlineStr">');
+    expect(functionalSheetXml).toContain('<c r="A2" s="2" t="inlineStr">');
+    expect(performanceSheetXml).toContain('<c r="A1" s="1" t="inlineStr">');
+    expect(performanceSheetXml).toContain('<c r="A2" s="2" t="inlineStr">');
     expect(functionalSheetXml).not.toContain("需求编号");
     expect(functionalSheetXml).not.toContain("用例编号");
     expect(functionalSheetXml).not.toContain("测试点编号");
