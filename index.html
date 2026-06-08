@@ -1,0 +1,1224 @@
+<!doctype html>
+<html lang="zh-CN">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>TestSpec — 需求驱动的测试设计 CLI</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap"
+			rel="stylesheet"
+		/>
+		<style>
+			*,
+			*::before,
+			*::after {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+			:root {
+				--bg: #0a0a0f;
+				--bg-card: #111118;
+				--bg-card-hover: #16161f;
+				--surface: #1a1a24;
+				--border: #2a2a3a;
+				--text: #e8e8f0;
+				--text-dim: #8888a0;
+				--text-muted: #555568;
+				--accent: #00e5a0;
+				--accent-dim: #00e5a033;
+				--accent-glow: #00e5a066;
+				--cyan: #00d4ff;
+				--violet: #a78bfa;
+				--amber: #fbbf24;
+				--rose: #fb7185;
+				--font-body: "Outfit", sans-serif;
+				--font-mono: "JetBrains Mono", monospace;
+			}
+			html {
+				scroll-behavior: smooth;
+				font-size: 16px;
+			}
+			body {
+				background: var(--bg);
+				color: var(--text);
+				font-family: var(--font-body);
+				line-height: 1.6;
+				overflow-x: hidden;
+				-webkit-font-smoothing: antialiased;
+			}
+			::selection {
+				background: var(--accent-dim);
+				color: var(--accent);
+			}
+
+			/* Grid background */
+			body::before {
+				content: "";
+				position: fixed;
+				inset: 0;
+				z-index: 0;
+				pointer-events: none;
+				background-image:
+					linear-gradient(var(--border) 1px, transparent 1px),
+					linear-gradient(90deg, var(--border) 1px, transparent 1px);
+				background-size: 80px 80px;
+				opacity: 0.15;
+			}
+			body::after {
+				content: "";
+				position: fixed;
+				inset: 0;
+				z-index: 0;
+				pointer-events: none;
+				background: radial-gradient(
+					ellipse 60% 50% at 50% 0%,
+					#00e5a008 0%,
+					transparent 70%
+				);
+			}
+
+			/* Utility */
+			.container {
+				max-width: 1200px;
+				margin: 0 auto;
+				padding: 0 2rem;
+				position: relative;
+				z-index: 1;
+			}
+			.section {
+				padding: 6rem 0;
+			}
+			.badge {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.4rem;
+				font-family: var(--font-mono);
+				font-size: 0.75rem;
+				font-weight: 500;
+				color: var(--accent);
+				background: var(--accent-dim);
+				border: 1px solid #00e5a022;
+				border-radius: 100px;
+				padding: 0.35rem 0.9rem;
+				letter-spacing: 0.02em;
+			}
+			.badge::before {
+				content: "";
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: var(--accent);
+				animation: pulse-dot 2s infinite;
+			}
+			@keyframes pulse-dot {
+				0%,
+				100% {
+					opacity: 1;
+				}
+				50% {
+					opacity: 0.3;
+				}
+			}
+
+			/* Animations */
+			@keyframes fade-up {
+				from {
+					opacity: 0;
+					transform: translateY(30px);
+				}
+				to {
+					opacity: 1;
+					transform: translateY(0);
+				}
+			}
+			@keyframes fade-in {
+				from {
+					opacity: 0;
+				}
+				to {
+					opacity: 1;
+				}
+			}
+			@keyframes typing {
+				from {
+					width: 0;
+				}
+				to {
+					width: 100%;
+				}
+			}
+			.reveal {
+				opacity: 0;
+				transform: translateY(30px);
+				transition: all 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+			}
+			.reveal.visible {
+				opacity: 1;
+				transform: translateY(0);
+			}
+			.reveal-delay-1 {
+				transition-delay: 0.1s;
+			}
+			.reveal-delay-2 {
+				transition-delay: 0.2s;
+			}
+			.reveal-delay-3 {
+				transition-delay: 0.3s;
+			}
+			.reveal-delay-4 {
+				transition-delay: 0.4s;
+			}
+
+			/* ─── NAV ─── */
+			nav {
+				position: fixed;
+				top: 0;
+				left: 0;
+				right: 0;
+				z-index: 100;
+				backdrop-filter: blur(20px);
+				-webkit-backdrop-filter: blur(20px);
+				background: rgba(10, 10, 15, 0.8);
+				border-bottom: 1px solid var(--border);
+			}
+			.nav-inner {
+				max-width: 1200px;
+				margin: 0 auto;
+				padding: 0 2rem;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				height: 64px;
+			}
+			.nav-brand {
+				display: flex;
+				align-items: center;
+				gap: 0.6rem;
+				text-decoration: none;
+			}
+			.nav-logo {
+				font-family: var(--font-mono);
+				font-weight: 700;
+				font-size: 1.1rem;
+				color: var(--text);
+				letter-spacing: -0.02em;
+			}
+			.nav-logo span {
+				color: var(--accent);
+			}
+			.nav-links {
+				display: flex;
+				gap: 2rem;
+				align-items: center;
+			}
+			.nav-links a {
+				color: var(--text-dim);
+				text-decoration: none;
+				font-size: 0.9rem;
+				font-weight: 400;
+				transition: color 0.2s;
+			}
+			.nav-links a:hover {
+				color: var(--text);
+			}
+			.nav-cta {
+				font-family: var(--font-mono);
+				font-size: 0.8rem;
+				font-weight: 500;
+				color: var(--bg);
+				background: var(--accent);
+				padding: 0.5rem 1.2rem;
+				border-radius: 6px;
+				text-decoration: none;
+				transition: all 0.2s;
+			}
+			.nav-cta:hover {
+				box-shadow: 0 0 20px var(--accent-glow);
+				transform: translateY(-1px);
+			}
+
+			/* ─── HERO ─── */
+			.hero {
+				padding: 10rem 0 6rem;
+				text-align: center;
+				position: relative;
+			}
+			.hero-glow {
+				position: absolute;
+				top: 30%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				width: 600px;
+				height: 600px;
+				border-radius: 50%;
+				background: radial-gradient(circle, #00e5a010 0%, transparent 70%);
+				pointer-events: none;
+			}
+			.hero h1 {
+				font-size: clamp(2.8rem, 6vw, 4.5rem);
+				font-weight: 800;
+				line-height: 1.1;
+				letter-spacing: -0.03em;
+				margin-bottom: 1.5rem;
+				animation: fade-up 0.8s ease both;
+			}
+			.hero h1 .gradient {
+				background: linear-gradient(135deg, var(--accent), var(--cyan));
+				-webkit-background-clip: text;
+				-webkit-text-fill-color: transparent;
+				background-clip: text;
+			}
+			.hero-sub {
+				font-size: 1.25rem;
+				color: var(--text-dim);
+				max-width: 600px;
+				margin: 0 auto 2.5rem;
+				font-weight: 300;
+				line-height: 1.7;
+				animation: fade-up 0.8s ease 0.15s both;
+			}
+			.hero-actions {
+				display: flex;
+				gap: 1rem;
+				justify-content: center;
+				flex-wrap: wrap;
+				animation: fade-up 0.8s ease 0.3s both;
+			}
+			.btn-primary {
+				font-family: var(--font-mono);
+				font-size: 0.9rem;
+				font-weight: 600;
+				color: var(--bg);
+				background: var(--accent);
+				padding: 0.8rem 2rem;
+				border-radius: 8px;
+				text-decoration: none;
+				border: none;
+				cursor: pointer;
+				transition: all 0.25s;
+			}
+			.btn-primary:hover {
+				box-shadow: 0 0 30px var(--accent-glow);
+				transform: translateY(-2px);
+			}
+			.btn-secondary {
+				font-family: var(--font-mono);
+				font-size: 0.9rem;
+				font-weight: 500;
+				color: var(--text);
+				background: var(--surface);
+				padding: 0.8rem 2rem;
+				border-radius: 8px;
+				text-decoration: none;
+				border: 1px solid var(--border);
+				transition: all 0.25s;
+			}
+			.btn-secondary:hover {
+				border-color: var(--text-muted);
+				background: var(--bg-card-hover);
+			}
+
+			/* Terminal */
+			.terminal {
+				max-width: 720px;
+				margin: 4rem auto 0;
+				background: #0d0d14;
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				overflow: hidden;
+				box-shadow:
+					0 25px 60px rgba(0, 0, 0, 0.5),
+					0 0 40px #00e5a006;
+				animation: fade-up 0.8s ease 0.45s both;
+				text-align: left;
+			}
+			.terminal-bar {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				padding: 14px 18px;
+				background: #111119;
+				border-bottom: 1px solid var(--border);
+			}
+			.terminal-dot {
+				width: 12px;
+				height: 12px;
+				border-radius: 50%;
+			}
+			.terminal-dot.r {
+				background: #ff5f57;
+			}
+			.terminal-dot.y {
+				background: #ffbd2e;
+			}
+			.terminal-dot.g {
+				background: #28ca41;
+			}
+			.terminal-title {
+				flex: 1;
+				text-align: center;
+				font-family: var(--font-mono);
+				font-size: 0.75rem;
+				color: var(--text-muted);
+			}
+			.terminal-body {
+				padding: 1.5rem;
+				font-family: var(--font-mono);
+				font-size: 0.85rem;
+				line-height: 1.8;
+			}
+			.terminal-body .prompt {
+				color: var(--accent);
+			}
+			.terminal-body .cmd {
+				color: var(--text);
+			}
+			.terminal-body .flag {
+				color: var(--cyan);
+			}
+			.terminal-body .arg {
+				color: var(--amber);
+			}
+			.terminal-body .comment {
+				color: var(--text-muted);
+			}
+			.terminal-body .output {
+				color: var(--text-dim);
+			}
+			.typing-line {
+				overflow: hidden;
+				white-space: nowrap;
+				border-right: 2px solid var(--accent);
+				animation:
+					typing 2s steps(40) 1s both,
+					blink-caret 0.75s step-end infinite;
+			}
+			@keyframes blink-caret {
+				from,
+				to {
+					border-color: var(--accent);
+				}
+				50% {
+					border-color: transparent;
+				}
+			}
+
+			/* ─── FEATURES ─── */
+			.features-grid {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: 1.5rem;
+				margin-top: 3rem;
+			}
+			.feature-card {
+				background: var(--bg-card);
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				padding: 2rem;
+				transition: all 0.3s ease;
+				position: relative;
+				overflow: hidden;
+			}
+			.feature-card::before {
+				content: "";
+				position: absolute;
+				top: 0;
+				left: 0;
+				right: 0;
+				height: 2px;
+				background: linear-gradient(
+					90deg,
+					transparent,
+					var(--accent),
+					transparent
+				);
+				opacity: 0;
+				transition: opacity 0.3s;
+			}
+			.feature-card:hover {
+				border-color: #00e5a033;
+				background: var(--bg-card-hover);
+				transform: translateY(-4px);
+				box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+			}
+			.feature-card:hover::before {
+				opacity: 1;
+			}
+			.feature-icon {
+				width: 48px;
+				height: 48px;
+				border-radius: 10px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-size: 1.4rem;
+				margin-bottom: 1.2rem;
+				background: var(--accent-dim);
+				border: 1px solid #00e5a022;
+			}
+			.feature-card h3 {
+				font-size: 1.1rem;
+				font-weight: 600;
+				margin-bottom: 0.6rem;
+			}
+			.feature-card p {
+				font-size: 0.9rem;
+				color: var(--text-dim);
+				line-height: 1.6;
+			}
+
+			/* ─── WORKFLOW ─── */
+			.workflow-section {
+				background: linear-gradient(180deg, var(--bg) 0%, #0d0d16 100%);
+			}
+			.workflow-steps {
+				display: flex;
+				flex-direction: column;
+				gap: 0;
+				margin-top: 3rem;
+				position: relative;
+			}
+			.workflow-steps::before {
+				content: "";
+				position: absolute;
+				left: 28px;
+				top: 0;
+				bottom: 0;
+				width: 2px;
+				background: linear-gradient(
+					180deg,
+					var(--accent),
+					var(--cyan),
+					var(--violet),
+					var(--amber)
+				);
+				opacity: 0.3;
+			}
+			.wf-step {
+				display: flex;
+				gap: 2rem;
+				align-items: flex-start;
+				padding: 1.5rem 0;
+				position: relative;
+			}
+			.wf-num {
+				width: 56px;
+				height: 56px;
+				border-radius: 50%;
+				flex-shrink: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-family: var(--font-mono);
+				font-weight: 700;
+				font-size: 1rem;
+				background: var(--bg-card);
+				border: 2px solid var(--border);
+				position: relative;
+				z-index: 1;
+				transition: all 0.3s;
+			}
+			.wf-step:hover .wf-num {
+				border-color: var(--accent);
+				box-shadow: 0 0 20px var(--accent-dim);
+			}
+			.wf-content {
+				padding-top: 0.5rem;
+			}
+			.wf-content h3 {
+				font-size: 1.05rem;
+				font-weight: 600;
+				margin-bottom: 0.3rem;
+			}
+			.wf-content .wf-cmd {
+				font-family: var(--font-mono);
+				font-size: 0.8rem;
+				color: var(--accent);
+				margin-bottom: 0.4rem;
+			}
+			.wf-content p {
+				font-size: 0.88rem;
+				color: var(--text-dim);
+				max-width: 500px;
+			}
+
+			/* ─── CODE EXAMPLE ─── */
+			.code-section {
+				overflow: hidden;
+			}
+			.code-grid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 3rem;
+				margin-top: 3rem;
+				align-items: start;
+			}
+			.code-block {
+				background: #0d0d14;
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				overflow: hidden;
+			}
+			.code-header {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 0.8rem 1.2rem;
+				background: #111119;
+				border-bottom: 1px solid var(--border);
+				font-family: var(--font-mono);
+				font-size: 0.75rem;
+				color: var(--text-muted);
+			}
+			.code-content {
+				padding: 1.5rem;
+				font-family: var(--font-mono);
+				font-size: 0.82rem;
+				line-height: 1.9;
+				overflow-x: auto;
+			}
+			.code-content .k {
+				color: var(--violet);
+			}
+			.code-content .s {
+				color: var(--accent);
+			}
+			.code-content .c {
+				color: var(--text-muted);
+			}
+			.code-content .f {
+				color: var(--cyan);
+			}
+			.code-content .n {
+				color: var(--amber);
+			}
+
+			/* ─── AGENTS ─── */
+			.agents-grid {
+				display: grid;
+				grid-template-columns: repeat(4, 1fr);
+				gap: 1.2rem;
+				margin-top: 3rem;
+			}
+			.agent-card {
+				background: var(--bg-card);
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				padding: 1.5rem;
+				text-align: center;
+				transition: all 0.3s;
+			}
+			.agent-card:hover {
+				border-color: var(--accent);
+				transform: translateY(-3px);
+			}
+			.agent-card .agent-icon {
+				font-size: 2rem;
+				margin-bottom: 0.8rem;
+			}
+			.agent-card h4 {
+				font-size: 0.95rem;
+				font-weight: 600;
+				margin-bottom: 0.3rem;
+			}
+			.agent-card p {
+				font-size: 0.8rem;
+				color: var(--text-dim);
+			}
+
+			/* ─── INSTALL ─── */
+			.install-section {
+				text-align: center;
+			}
+			.install-box {
+				display: inline-block;
+				background: #0d0d14;
+				border: 1px solid var(--border);
+				border-radius: 12px;
+				padding: 2rem 3rem;
+				margin-top: 2rem;
+				font-family: var(--font-mono);
+				position: relative;
+			}
+			.install-box .dollar {
+				color: var(--accent);
+			}
+			.install-box .install-cmd {
+				font-size: 1.1rem;
+				color: var(--text);
+			}
+			.install-box .copy-btn {
+				position: absolute;
+				top: 0.8rem;
+				right: 0.8rem;
+				background: var(--surface);
+				border: 1px solid var(--border);
+				color: var(--text-dim);
+				border-radius: 6px;
+				padding: 0.4rem 0.7rem;
+				font-family: var(--font-mono);
+				font-size: 0.7rem;
+				cursor: pointer;
+				transition: all 0.2s;
+			}
+			.install-box .copy-btn:hover {
+				border-color: var(--accent);
+				color: var(--accent);
+			}
+
+			/* ─── FOOTER ─── */
+			footer {
+				border-top: 1px solid var(--border);
+				padding: 3rem 0;
+				text-align: center;
+				color: var(--text-muted);
+				font-size: 0.85rem;
+			}
+			footer a {
+				color: var(--text-dim);
+				text-decoration: none;
+				transition: color 0.2s;
+			}
+			footer a:hover {
+				color: var(--accent);
+			}
+			.footer-links {
+				display: flex;
+				gap: 2rem;
+				justify-content: center;
+				margin-bottom: 1rem;
+			}
+
+			/* ─── SECTION HEADERS ─── */
+			.section-header {
+				text-align: center;
+				margin-bottom: 1rem;
+			}
+			.section-header h2 {
+				font-size: clamp(2rem, 4vw, 2.8rem);
+				font-weight: 700;
+				letter-spacing: -0.02em;
+				margin-bottom: 0.8rem;
+			}
+			.section-header p {
+				color: var(--text-dim);
+				font-size: 1.05rem;
+				max-width: 550px;
+				margin: 0 auto;
+			}
+
+			/* Responsive */
+			@media (max-width: 900px) {
+				.features-grid {
+					grid-template-columns: 1fr 1fr;
+				}
+				.code-grid {
+					grid-template-columns: 1fr;
+				}
+				.agents-grid {
+					grid-template-columns: 1fr 1fr;
+				}
+				.nav-links {
+					display: none;
+				}
+			}
+			@media (max-width: 600px) {
+				.features-grid {
+					grid-template-columns: 1fr;
+				}
+				.agents-grid {
+					grid-template-columns: 1fr;
+				}
+				.hero {
+					padding: 8rem 0 4rem;
+				}
+				.section {
+					padding: 4rem 0;
+				}
+				.wf-step {
+					gap: 1rem;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<!-- NAV -->
+		<nav>
+			<div class="nav-inner">
+				<a href="#" class="nav-brand">
+					<div class="nav-logo">Test<span>Spec</span></div>
+				</a>
+				<div class="nav-links">
+					<a href="#features">功能</a>
+					<a href="#workflow">工作流</a>
+					<a href="#agents">集成</a>
+					<a href="#install">安装</a>
+					<a href="https://github.com/mxr-vector/TestSpec" target="_blank"
+						>GitHub</a
+					>
+					<a href="#install" class="nav-cta">快速开始</a>
+				</div>
+			</div>
+		</nav>
+
+		<!-- HERO -->
+		<section class="hero">
+			<div class="hero-glow"></div>
+			<div class="container">
+				<div class="badge">v0.2.5 · 开源 · MIT 许可</div>
+				<h1 style="margin-top: 1.5rem">
+					需求驱动的<br /><span class="gradient">测试设计 CLI</span>
+				</h1>
+				<p class="hero-sub">
+					为 AI 辅助 QA 工作流而生。从需求文档到可执行测试用例，TestSpec
+					让测试设计结构化、可追溯、可自动化。
+				</p>
+				<div class="hero-actions">
+					<a href="#install" class="btn-primary">开始使用</a>
+					<a
+						href="https://github.com/mxr-vector/TestSpec"
+						class="btn-secondary"
+						target="_blank"
+						>查看源码 →</a
+					>
+				</div>
+
+				<!-- Terminal demo -->
+				<div class="terminal">
+					<div class="terminal-bar">
+						<div class="terminal-dot r"></div>
+						<div class="terminal-dot y"></div>
+						<div class="terminal-dot g"></div>
+						<div class="terminal-title">testspec — terminal</div>
+					</div>
+					<div class="terminal-body">
+						<div><span class="comment"># 初始化项目并配置 AI 代理</span></div>
+						<div>
+							<span class="prompt">$ </span><span class="cmd">testspec</span>
+							<span class="flag">init</span> <span class="flag">--agents</span>
+							<span class="arg">claude,qoder</span>
+						</div>
+						<div class="output">✓ 已创建 testspec/ 工作区</div>
+						<div class="output">✓ 已配置 Claude Code + Qoder 集成</div>
+						<div style="margin-top: 0.5rem">
+							<span class="comment"># 从需求文档创建测试提案</span>
+						</div>
+						<div>
+							<span class="prompt">$ </span><span class="cmd">testspec</span>
+							<span class="flag">new</span> <span class="arg">login-v2</span>
+							<span class="flag">--requirement</span>
+							<span class="arg">docs/login-prd.md</span>
+						</div>
+						<div class="output">
+							✓ 已创建 testspec/changes/login-v2/proposal.md
+						</div>
+						<div style="margin-top: 0.5rem">
+							<span class="comment"># 导出测试用例到 Excel</span>
+						</div>
+						<div>
+							<span class="prompt">$ </span><span class="cmd">testspec</span>
+							<span class="flag">excel</span> <span class="arg">login-v2</span>
+						</div>
+						<div class="output">✓ 校验通过 (24 cases, 0 errors)</div>
+						<div class="output">✓ 已导出 artifacts/login-v2_cases.xlsx</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- FEATURES -->
+		<section class="section" id="features">
+			<div class="container">
+				<div class="section-header reveal">
+					<div class="badge">核心能力</div>
+					<h2 style="margin-top: 1rem">为测试设计而生的<br />完整工具链</h2>
+					<p>覆盖需求分析到测试归档的全链路，让每一步都可追溯、可复现。</p>
+				</div>
+				<div class="features-grid">
+					<div class="feature-card reveal reveal-delay-1">
+						<div class="feature-icon">📋</div>
+						<h3>结构化工作流</h3>
+						<p>
+							从需求文档 → 需求分析 → 测试点 → 测试用例 → Excel / 思维导图 →
+							报告 → 归档，一条完整的测试设计流水线。
+						</p>
+					</div>
+					<div class="feature-card reveal reveal-delay-2">
+						<div class="feature-icon">🤖</div>
+						<h3>多 AI 代理集成</h3>
+						<p>
+							原生支持 Claude Code、Qoder、Codex、Trae 等 AI 编码代理，通过
+							<code>/test:*</code> 工作流标签驱动语义生成。
+						</p>
+					</div>
+					<div class="feature-card reveal reveal-delay-3">
+						<div class="feature-icon">📊</div>
+						<h3>Excel 导出</h3>
+						<p>
+							自动生成包含功能测试与性能测试两个工作表的可执行测试用例
+							Excel，直接用于测试执行。
+						</p>
+					</div>
+					<div class="feature-card reveal reveal-delay-1">
+						<div class="feature-icon">🧠</div>
+						<h3>思维导图导出</h3>
+						<p>
+							将测试用例导出为 XMind 格式的思维导图，便于团队评审和可视化讨论。
+						</p>
+					</div>
+					<div class="feature-card reveal reveal-delay-2">
+						<div class="feature-icon">🔗</div>
+						<h3>全链路可追溯</h3>
+						<p>
+							严格维护需求文档、测试点、测试用例三者之间的映射关系，确保测试覆盖无遗漏。
+						</p>
+					</div>
+					<div class="feature-card reveal reveal-delay-3">
+						<div class="feature-icon">📦</div>
+						<h3>归档系统</h3>
+						<p>
+							自动将已完成的测试周期产物归档至 archive 目录，含 manifest.json
+							元数据，支持审计和回溯。
+						</p>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- WORKFLOW -->
+		<section class="section workflow-section" id="workflow">
+			<div class="container">
+				<div class="section-header reveal">
+					<div class="badge">工作流</div>
+					<h2 style="margin-top: 1rem">8 步完成<br />测试设计全流程</h2>
+					<p>每一步都有明确的输入、输出和质量门禁。</p>
+				</div>
+				<div class="workflow-steps">
+					<div class="wf-step reveal">
+						<div class="wf-num">01</div>
+						<div class="wf-content">
+							<h3>初始化项目</h3>
+							<div class="wf-cmd">testspec init --agents claude,qoder</div>
+							<p>
+								创建 testspec 工作区，配置 AI 代理集成，生成交互式命令文件。
+							</p>
+						</div>
+					</div>
+					<div class="wf-step reveal">
+						<div class="wf-num">02</div>
+						<div class="wf-content">
+							<h3>创建测试提案</h3>
+							<div class="wf-cmd">
+								testspec new &lt;name&gt; --requirement &lt;path&gt;
+							</div>
+							<p>从需求文档创建测试变更目录和提案模板，关联原始需求。</p>
+						</div>
+					</div>
+					<div class="wf-step reveal">
+						<div class="wf-num">03</div>
+						<div class="wf-content">
+							<h3>需求分析</h3>
+							<div class="wf-cmd">/test:analysis &lt;name&gt;</div>
+							<p>AI 代理读取需求文档，拆解为可测试项、风险点和待确认问题。</p>
+						</div>
+					</div>
+					<div class="wf-step reveal">
+						<div class="wf-num">04</div>
+						<div class="wf-content">
+							<h3>生成测试点</h3>
+							<div class="wf-cmd">/test:points &lt;name&gt;</div>
+							<p>
+								基于需求分析推导可追溯的测试点清单，覆盖功能、边界和异常场景。
+							</p>
+						</div>
+					</div>
+					<div class="wf-step reveal">
+						<div class="wf-num">05</div>
+						<div class="wf-content">
+							<h3>校验产物</h3>
+							<div class="wf-cmd">testspec validate &lt;name&gt;</div>
+							<p>
+								CLI 校验生成产物的 schema 合规性、可追溯性和质量，确保可导出。
+							</p>
+						</div>
+					</div>
+					<div class="wf-step reveal">
+						<div class="wf-num">06</div>
+						<div class="wf-content">
+							<h3>导出 Excel / 思维导图</h3>
+							<div class="wf-cmd">
+								testspec excel &lt;name&gt; · testspec mind &lt;name&gt;
+							</div>
+							<p>
+								导出可执行的 Excel 测试用例和 XMind 思维导图，用于执行和评审。
+							</p>
+						</div>
+					</div>
+					<div class="wf-step reveal">
+						<div class="wf-num">07</div>
+						<div class="wf-content">
+							<h3>生成报告</h3>
+							<div class="wf-cmd">testspec report &lt;name&gt;</div>
+							<p>在 Excel 中填写执行结果后，自动生成执行统计报告。</p>
+						</div>
+					</div>
+					<div class="wf-step reveal">
+						<div class="wf-num">08</div>
+						<div class="wf-content">
+							<h3>归档</h3>
+							<div class="wf-cmd">testspec archive &lt;name&gt;</div>
+							<p>将完整测试产物链归档至 archive 目录，保留可追溯记录。</p>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- CODE EXAMPLES -->
+		<section class="section code-section" id="schema">
+			<div class="container">
+				<div class="section-header reveal">
+					<div class="badge">设计哲学</div>
+					<h2 style="margin-top: 1rem">
+						CLI 无供应商依赖<br />AI 负责语义生成
+					</h2>
+					<p>
+						TestSpec CLI 保持确定性和无模型依赖，AI 代理负责需求理解和用例生成。
+					</p>
+				</div>
+				<div class="code-grid">
+					<div class="code-block reveal">
+						<div class="code-header">
+							<span>testcases.json — 紧凑可执行 Schema</span>
+						</div>
+						<div class="code-content">
+							<span class="c">// 每个测试用例的精确字段结构</span>
+							{
+							<span class="k">"title"</span>:
+							<span class="s">"用户登录 - 正确凭证"</span>,
+							<span class="k">"module"</span>:
+							<span class="s">"认证模块"</span>, <span class="k">"type"</span>:
+							<span class="s">"功能测试"</span>,
+							<span class="k">"priority"</span>: <span class="s">"P0"</span>,
+							<span class="k">"preconditions"</span>:
+							<span class="s">"用户已注册且账户状态正常"</span>,
+							<span class="k">"steps"</span>: [
+							<span class="s">"打开登录页面"</span>,
+							<span class="s">"输入 username=testuser"</span>,
+							<span class="s">"输入 password=Valid@123"</span>,
+							<span class="s">"点击登录按钮"</span>
+							],
+							<span class="k">"expectedResult"</span>:
+							<span class="s">"跳转首页，展示用户头像和昵称"</span>
+							}
+						</div>
+					</div>
+					<div class="code-block reveal reveal-delay-2">
+						<div class="code-header">
+							<span>AI 代理工作流标签</span>
+						</div>
+						<div class="code-content">
+							<span class="c"># Claude Code / Qoder / Trae 斜杠命令</span>
+
+							<span class="f">/test:new</span> <span class="n">login-v2</span>
+							<span class="k">--requirement</span> docs/prd.md
+							<span class="f">/test:analysis</span>
+							<span class="n">login-v2</span>
+							<span class="f">/test:points</span>
+							<span class="n">login-v2</span>
+							<span class="f">/test:validate</span>
+							<span class="n">login-v2</span> <span class="f">/test:excel</span>
+							<span class="n">login-v2</span> <span class="f">/test:mind</span>
+							<span class="n">login-v2</span>
+							<span class="f">/test:report</span>
+							<span class="n">login-v2</span>
+							<span class="f">/test:archive</span>
+							<span class="n">login-v2</span>
+
+							<span class="c"># test:* 是代理工作流标签</span>
+							<span class="c"># 不是 shell 命令</span>
+							<span class="c"># 代理读取需求 → 生成产物 → CLI 校验导出</span>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- AGENTS -->
+		<section class="section" id="agents">
+			<div class="container">
+				<div class="section-header reveal">
+					<div class="badge">生态集成</div>
+					<h2 style="margin-top: 1rem">与你常用的<br />AI 编码代理无缝协作</h2>
+					<p>一次初始化，多代理共用同一套工作流标签。</p>
+				</div>
+				<div class="agents-grid">
+					<div class="agent-card reveal reveal-delay-1">
+						<div class="agent-icon">
+							<svg
+								width="32"
+								height="32"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.5"
+							>
+								<path
+									d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+									stroke="var(--accent)"
+								/>
+							</svg>
+						</div>
+						<h4>Claude Code</h4>
+						<p>.claude/commands/test/*.md<br />斜杠命令集成</p>
+					</div>
+					<div class="agent-card reveal reveal-delay-2">
+						<div class="agent-icon">
+							<svg
+								width="32"
+								height="32"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="var(--cyan)"
+								stroke-width="1.5"
+							>
+								<rect x="3" y="3" width="18" height="18" rx="3" />
+								<path d="M9 3v18M3 9h18" />
+							</svg>
+						</div>
+						<h4>Qoder</h4>
+						<p>.qoder/commands/test/*.md<br />工作流标签集成</p>
+					</div>
+					<div class="agent-card reveal reveal-delay-3">
+						<div class="agent-icon">
+							<svg
+								width="32"
+								height="32"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="var(--violet)"
+								stroke-width="1.5"
+							>
+								<circle cx="12" cy="12" r="9" />
+								<path d="M12 3v9l6 3" />
+							</svg>
+						</div>
+						<h4>Codex</h4>
+						<p>AGENTS.md 指南<br />标签映射到 CLI</p>
+					</div>
+					<div class="agent-card reveal reveal-delay-4">
+						<div class="agent-icon">
+							<svg
+								width="32"
+								height="32"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="var(--amber)"
+								stroke-width="1.5"
+							>
+								<polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5" />
+								<path d="M12 22V12M22 8.5L12 12 2 8.5" />
+							</svg>
+						</div>
+						<h4>Trae</h4>
+						<p>.trae/commands/test/*.md<br />命令文件集成</p>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- INSTALL -->
+		<section class="section install-section" id="install">
+			<div class="container">
+				<div class="section-header reveal">
+					<div class="badge">立即开始</div>
+					<h2 style="margin-top: 1rem">一行命令<br />开启高效测试设计</h2>
+					<p>支持全局安装或 npx 免安装运行，零配置即可上手。</p>
+				</div>
+				<div class="install-box reveal" id="installBox">
+					<button class="copy-btn" onclick="copyInstall()">复制</button>
+					<div>
+						<span class="dollar">$ </span
+						><span class="install-cmd"
+							>npm install -g @wangjh2001/testspec</span
+						>
+					</div>
+				</div>
+				<div
+					style="margin-top: 2rem; color: var(--text-muted); font-size: 0.9rem"
+					class="reveal"
+				>
+					或使用 npx 免安装运行：<code
+						style="color: var(--accent); font-family: var(--font-mono)"
+						>npx @wangjh2001/testspec init</code
+					>
+				</div>
+			</div>
+		</section>
+
+		<!-- FOOTER -->
+		<footer>
+			<div class="container">
+				<div class="footer-links">
+					<a href="https://github.com/mxr-vector/TestSpec" target="_blank"
+						>GitHub</a
+					>
+					<a
+						href="https://www.npmjs.com/package/@wangjh2001/testspec"
+						target="_blank"
+						>npm</a
+					>
+					<a
+						href="https://github.com/mxr-vector/TestSpec/issues"
+						target="_blank"
+						>问题反馈</a
+					>
+				</div>
+				<p>TestSpec v0.2.5 · MIT License · Made with care by YuanJie</p>
+			</div>
+		</footer>
+
+		<script>
+			// Scroll reveal
+			const observer = new IntersectionObserver(
+				(entries) => {
+					entries.forEach((entry) => {
+						if (entry.isIntersecting) {
+							entry.target.classList.add("visible");
+						}
+					});
+				},
+				{ threshold: 0.1, rootMargin: "0px 0px -50px 0px" },
+			);
+
+			document
+				.querySelectorAll(".reveal")
+				.forEach((el) => observer.observe(el));
+
+			// Copy install command
+			function copyInstall() {
+				navigator.clipboard.writeText("npm install -g @wangjh2001/testspec");
+				const btn = document.querySelector(".copy-btn");
+				btn.textContent = "已复制!";
+				setTimeout(() => (btn.textContent = "复制"), 2000);
+			}
+
+			// Smooth nav highlight
+			const sections = document.querySelectorAll("section[id]");
+			const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
+			window.addEventListener("scroll", () => {
+				let current = "";
+				sections.forEach((s) => {
+					if (window.scrollY >= s.offsetTop - 200) current = s.id;
+				});
+				navLinks.forEach((a) => {
+					a.style.color =
+						a.getAttribute("href") === "#" + current ? "var(--accent)" : "";
+				});
+			});
+		</script>
+	</body>
+</html>
