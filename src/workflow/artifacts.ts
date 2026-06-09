@@ -1,32 +1,111 @@
+/**
+ * @fileoverview TestSpec 生成产物模块
+ * 
+ * 该模块实现了 TestSpec 工作流中的核心生成功能，包括：
+ * 1. 生成测试提案（proposal.md）
+ * 2. 生成需求分析文档（requirements-analysis.md）
+ * 3. 生成测试点清单（specs/testpoints.md）
+ * 
+ * 生成流程：
+ * - proposal.md: 包含被测对象、关联需求文档、测试目标、测试范围等
+ * - requirements-analysis.md: 包含需求摘要、功能点拆解、业务规则、风险点等
+ * - testpoints.md: 包含核心流程、负向场景、边界场景、异常场景、权限/安全场景
+ * 
+ * 所有生成的文档都支持追溯性，通过 REQ-xxx 和 TP-xxx 标识符关联。
+ */
+
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { ChangeWorkspace } from "./workspace.js";
 
+/**
+ * 测试提案选项接口
+ * 
+ * @interface ProposalOptions
+ * @property {string} [requirement] - 关联需求文档路径或 URL
+ * @property {string} [testedObject] - 被测对象名称，默认为测试变更名称
+ */
 export interface ProposalOptions {
   requirement?: string;
   testedObject?: string;
 }
 
+/**
+ * 需求文档引用接口
+ * 
+ * @interface RequirementReference
+ * @property {string} reference - 需求文档的原始引用路径
+ * @property {string} content - 需求文档的内容
+ */
 interface RequirementReference {
   reference: string;
   content: string;
 }
 
+/**
+ * 需求分析上下文接口
+ * 
+ * @interface AnalysisContext
+ * @property {string} proposal - 测试提案内容
+ * @property {RequirementReference | undefined} requirementReference - 需求文档引用（可选）
+ */
 interface AnalysisContext {
   proposal: string;
   requirementReference: RequirementReference | undefined;
 }
 
+/**
+ * 分析功能点接口
+ * 
+ * @interface AnalysisFeature
+ * @property {string} id - 功能点标识符（如 REQ-001）
+ * @property {string} name - 功能点名称
+ */
 interface AnalysisFeature {
   id: string;
   name: string;
 }
 
+/**
+ * 分析风险接口
+ * 
+ * @interface AnalysisRisk
+ * @property {string} id - 风险标识符（如 RISK-001）
+ * @property {string} title - 风险标题
+ */
 interface AnalysisRisk {
   id: string;
   title: string;
 }
 
+/**
+ * 生成测试提案文件（proposal.md）
+ * 
+ * 该函数负责生成测试提案文档，包含以下内容：
+ * - 被测对象：测试的目标系统或功能
+ * - 关联需求文档：需求文档路径或 URL
+ * - 测试目标：验证核心业务流程、识别风险
+ * - 测试范围：范围内和范围外的功能
+ * - 测试边界：以需求文档和提案范围为准
+ * - 假设与依赖：测试环境、账号、数据等
+ * - 风险预判：需求不完整、依赖不可用等
+ * - 后续步骤：运行 analysis 和 points 命令
+ * 
+ * @param {ChangeWorkspace} workspace - 测试变更工作区对象
+ * @param {ProposalOptions} [options] - 提案选项
+ * @param {string} [options.requirement] - 关联需求文档路径或 URL
+ * @param {string} [options.testedObject] - 被测对象名称
+ * @returns {Promise<string>} 生成的 proposal.md 文件路径
+ * 
+ * @example
+ * ```typescript
+ * const proposalPath = await writeProposal(workspace, {
+ *   requirement: './docs/requirements.md',
+ *   testedObject: '用户登录功能'
+ * });
+ * console.log(`提案已生成: ${proposalPath}`);
+ * ```
+ */
 export async function writeProposal(
   workspace: ChangeWorkspace,
   options: ProposalOptions = {}
@@ -87,6 +166,31 @@ export async function writeProposal(
   return outputPath;
 }
 
+/**
+ * 生成需求分析文档（requirements-analysis.md）
+ * 
+ * 该函数负责生成结构化的需求分析文档，包含以下内容：
+ * - 需求摘要：基于测试提案和需求文档的总结
+ * - 需求参考文档：关联需求文档的路径和摘录
+ * - 功能点拆解：以表格形式列出功能点、用户目标、输入、输出、规则、可测性
+ * - 业务规则：待根据需求文档细化
+ * - 状态流转：待根据需求文档细化
+ * - 权限与角色：若需求涉及角色、权限或安全边界
+ * - 数据约束：输入、输出、格式、唯一性和边界约束
+ * - 异常与边界：输入为空、格式错误、超长、重复提交等
+ * - 依赖系统：外部服务、接口、数据源或配置依赖
+ * - 风险点：需求边界不清晰、依赖不可用等
+ * - 待澄清问题：未在需求中明确的异常处理规则等
+ * 
+ * @param {ChangeWorkspace} workspace - 测试变更工作区对象
+ * @returns {Promise<string>} 生成的 requirements-analysis.md 文件路径
+ * 
+ * @example
+ * ```typescript
+ * const analysisPath = await writeRequirementsAnalysis(workspace);
+ * console.log(`需求分析已生成: ${analysisPath}`);
+ * ```
+ */
 export async function writeRequirementsAnalysis(workspace: ChangeWorkspace): Promise<string> {
   const proposal = await readOptional(join(workspace.changeDir, "proposal.md"));
   const requirementReference = await readRequirementReference(workspace, proposal);
@@ -151,6 +255,31 @@ export async function writeRequirementsAnalysis(workspace: ChangeWorkspace): Pro
   return outputPath;
 }
 
+/**
+ * 生成测试点清单（specs/testpoints.md）
+ * 
+ * 该函数负责生成可追溯的测试点清单，包含以下内容：
+ * - 上下文来源：测试提案和需求分析文档的状态
+ * - 核心流程：基于功能点拆解的主要成功路径测试点
+ * - 负向场景：输入无效、缺失或不满足业务规则时的测试点
+ * - 边界场景：输入长度、数量、金额、时间等边界值处理的测试点
+ * - 异常场景：依赖服务不可用、网络异常或重复提交时的测试点
+ * - 权限/安全场景：未授权、越权或敏感数据访问的测试点
+ * - 风险覆盖映射：风险编号与测试点的对应关系
+ * 
+ * 测试点标识符格式：TP-xxx（如 TP-001、TP-101、TP-201 等）
+ * 功能点标识符格式：REQ-xxx（如 REQ-001、REQ-002 等）
+ * 风险标识符格式：RISK-xxx（如 RISK-001、RISK-002 等）
+ * 
+ * @param {ChangeWorkspace} workspace - 测试变更工作区对象
+ * @returns {Promise<string>} 生成的 testpoints.md 文件路径
+ * 
+ * @example
+ * ```typescript
+ * const testpointsPath = await writeTestPoints(workspace);
+ * console.log(`测试点清单已生成: ${testpointsPath}`);
+ * ```
+ */
 export async function writeTestPoints(workspace: ChangeWorkspace): Promise<string> {
   const proposal = await readOptional(join(workspace.changeDir, "proposal.md"));
   const analysis = await readOptional(join(workspace.changeDir, "requirements-analysis.md"));
