@@ -19,6 +19,7 @@
 import type { Command } from "commander";
 import { logInfo, logSuccess } from "../core/logger.js";
 import { initializeTestSpec } from "../init/agent-init.js";
+import { checkNpmUpdate } from "../utils/update-check.js";
 
 /**
  * 初始化命令选项接口
@@ -66,6 +67,8 @@ export function registerInitCommand(program: Command): void {
     )
     .option("-f, --force", "overwrite existing TestSpec-generated agent command files")
     .action(async (options: InitCommandOptions) => {
+      const updateCheckPromise = checkNpmUpdate();
+
       // 构建初始化选项对象
       const initOptions = {
         force: options.force === true,
@@ -84,5 +87,14 @@ export function registerInitCommand(program: Command): void {
       logInfo(
         `Outputs: ${result.created.length} created, ${result.refreshed.length} refreshed, ${result.preserved.length} preserved, ${result.removed.length} removed.`
       );
+
+      const updateInfo = await updateCheckPromise;
+
+      if (updateInfo !== undefined) {
+        logInfo(
+          `A newer version of TestSpec is available: ${updateInfo.currentVersion} → ${updateInfo.latestVersion}`
+        );
+        logInfo(`Run: npm install -g ${updateInfo.packageName}@latest`);
+      }
     });
 }

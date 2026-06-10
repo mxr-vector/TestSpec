@@ -48,13 +48,38 @@ describe("registerInitCommand", () => {
   });
 
   it("runs the init action through the CLI program", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
     const program = createProgram();
 
     await program.parseAsync(["init", "--agents", "claude"], { from: "user" });
 
+    expect(fetchSpy).toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Initialized TestSpec workspace."));
     await expect(stat(join(tempDir, "testspec", "changes", "archive"))).resolves.toMatchObject({});
+  });
+
+  it("prints an npm update hint after initializing when latest is newer", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ version: "99.0.0" }));
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const program = createProgram();
+
+    await program.parseAsync(["init", "--agents", "claude"], { from: "user" });
+
+    const calls = logSpy.mock.calls.map((call) => String(call[0]));
+    const initIndex = calls.findIndex((message) =>
+      message.includes("Initialized TestSpec workspace.")
+    );
+    const hintIndex = calls.findIndex((message) =>
+      message.includes("A newer version of TestSpec is available")
+    );
+    const installIndex = calls.findIndex((message) =>
+      message.includes("npm install -g @wangjh2001/testspec@latest")
+    );
+
+    expect(initIndex).toBeGreaterThan(-1);
+    expect(hintIndex).toBeGreaterThan(initIndex);
+    expect(installIndex).toBeGreaterThan(hintIndex);
   });
 });
 
