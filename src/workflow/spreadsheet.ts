@@ -1,18 +1,18 @@
 /**
  * @fileoverview TestSpec Excel 工作簿生成模块
- * 
+ *
  * 该模块实现了 Excel 工作簿的生成功能，包括：
  * 1. 生成符合 Office Open XML 格式的 .xlsx 文件
  * 2. 支持功能测试和性能测试两个工作表
  * 3. 提供样式定义（表头样式、边框样式）
  * 4. 支持从 Excel 文件读取执行结果
- * 
+ *
  * Excel 工作簿结构：
  * - 功能测试表：包含功能测试用例的详细信息
  *   - 功能模块、用例名称、用例类型、前置条件、测试步骤、预期结果、优先级、执行结果
  * - 性能测试表：包含性能测试用例的详细信息
- *   - 业务模块、场景名称、性能测试类型、测试目标、前置条件、并发用户数、持续时间、压测步骤、目标TPS/QPS、实际TPS/QPS、平均响应时间、P95响应时间、错误率、执行结果
- * 
+ *   - 场景编号、业务模块、场景名称、性能测试类型、关联测试点、测试目标、测试数据规模、负载模型、压测步骤、目标指标、实际指标、执行结果
+ *
  * 使用 fflate 库进行 ZIP 压缩，生成标准的 .xlsx 文件。
  * 支持读取 Excel 文件中的执行结果，用于生成测试报告。
  */
@@ -29,7 +29,7 @@ type WorkbookTestCase = TestCase & { executionResult?: string };
 
 /**
  * 功能测试 Excel 表头常量
- * 
+ *
  * 定义了功能测试工作表的列名，用于：
  * 1. 生成 Excel 文件时的表头行
  * 2. 读取 Excel 文件时的列映射
@@ -47,33 +47,49 @@ export const FUNCTIONAL_EXCEL_HEADERS = [
 
 /**
  * 性能测试 Excel 表头常量
- * 
+ *
  * 定义了性能测试工作表的列名，用于：
  * 1. 生成 Excel 文件时的表头行
  * 2. 读取 Excel 文件时的列映射
  */
 export const PERFORMANCE_EXCEL_HEADERS = [
+  "场景编号",
   "业务模块",
   "场景名称",
   "性能测试类型",
+  "关联需求编号",
+  "关联测试点编号",
   "测试目标",
-  "前置条件",
+  "业务占比/权重",
+  "测试数据规模",
+  "负载模型",
   "并发用户数",
   "持续时间",
+  "阶梯加压策略",
+  "前置条件",
   "压测步骤",
   "目标 TPS/QPS",
+  "平均响应时间目标(ms)",
+  "P95响应时间目标(ms)",
+  "P99响应时间目标(ms)",
+  "错误率目标(%)",
+  "监控指标",
+  "瓶颈观察点",
   "实际 TPS/QPS",
-  "平均响应时间(ms)",
-  "P95响应时间(ms)",
-  "错误率(%)",
+  "实际平均响应时间(ms)",
+  "实际P95响应时间(ms)",
+  "实际错误率(%)",
+  "CPU峰值(%)",
+  "内存峰值(MB)",
   "执行结果",
+  "备注",
 ] as const;
 
 /**
  * 执行行接口
- * 
+ *
  * 用于从 Excel 文件读取执行结果时的数据结构
- * 
+ *
  * @interface ExecutionRow
  * @property {string} caseId - 用例编号（如果没有则自动生成）
  * @property {string} title - 用例名称
@@ -101,19 +117,19 @@ interface WorksheetDescriptor {
 
 /**
  * 生成 Excel 工作簿文件
- * 
+ *
  * 该函数负责：
  * 1. 创建功能测试工作表
  * 2. 如果有性能测试用例，创建性能测试工作表
  * 3. 生成 Excel 所需的 XML 文件
  * 4. 创建 ZIP 压缩包（.xlsx 文件）
  * 5. 写入到指定路径
- * 
+ *
  * @param {string} path - 输出文件路径（.xlsx 扩展名）
  * @param {TCase[]} cases - 功能测试用例数组
  * @param {PerformanceCase[]} [performanceCases] - 性能测试用例数组（可选）
  * @returns {Promise<void>} 异步执行，无返回值
- * 
+ *
  * @example
  * ```typescript
  * const cases = [
@@ -127,7 +143,7 @@ interface WorksheetDescriptor {
  *     expectedResult: '登录成功，跳转到首页'
  *   }
  * ];
- * 
+ *
  * await writeExcelWorkbook('./output.xlsx', cases);
  * ```
  */
@@ -165,12 +181,12 @@ export async function writeExcelWorkbook<TCase extends WorkbookTestCase>(
 
   // 创建 ZIP 压缩包，包含 Excel 所需的所有 XML 文件
   const archive = zipSync({
-    "[Content_Types].xml": strToU8(contentTypesXml(worksheets)),  // 内容类型
-    "_rels/.rels": strToU8(rootRelationshipsXml()),  // 根关系
-    "xl/workbook.xml": strToU8(workbookXml(worksheets)),  // 工作簿
-    "xl/styles.xml": strToU8(stylesXml()),  // 样式
-    "xl/_rels/workbook.xml.rels": strToU8(workbookRelationshipsXml(worksheets)),  // 工作簿关系
-    ...worksheetEntries,  // 工作表内容
+    "[Content_Types].xml": strToU8(contentTypesXml(worksheets)), // 内容类型
+    "_rels/.rels": strToU8(rootRelationshipsXml()), // 根关系
+    "xl/workbook.xml": strToU8(workbookXml(worksheets)), // 工作簿
+    "xl/styles.xml": strToU8(stylesXml()), // 样式
+    "xl/_rels/workbook.xml.rels": strToU8(workbookRelationshipsXml(worksheets)), // 工作簿关系
+    ...worksheetEntries, // 工作表内容
   });
 
   // 写入 .xlsx 文件
@@ -179,17 +195,17 @@ export async function writeExcelWorkbook<TCase extends WorkbookTestCase>(
 
 /**
  * 从 Excel 文件读取执行结果
- * 
+ *
  * 该函数负责：
  * 1. 解压 .xlsx 文件（ZIP 格式）
  * 2. 读取功能测试工作表（sheet1.xml）
  * 3. 解析 XML 内容，提取表头和数据行
  * 4. 根据表头映射提取执行结果
  * 5. 返回执行行数组
- * 
+ *
  * @param {string} path - Excel 文件路径（.xlsx 扩展名）
  * @returns {Promise<ExecutionRow[]>} 执行行数组
- * 
+ *
  * @example
  * ```typescript
  * const rows = await readExecutionRows('./test-cases.xlsx');
@@ -270,20 +286,36 @@ function performanceRows(cases: PerformanceCase[]): string[][] {
   return [
     [...PERFORMANCE_EXCEL_HEADERS],
     ...sorted.map((testCase) => [
+      testCase.scenarioId ?? "",
       testCase.module,
       testCase.scenarioName,
       testCase.performanceType,
+      (testCase.requirementIds ?? []).join(", "),
+      (testCase.testPointIds ?? []).join(", "),
       testCase.objective,
-      testCase.preconditions,
+      testCase.businessWeight ?? "",
+      testCase.testData ?? "",
+      testCase.loadModel ?? "",
       testCase.concurrentUsers,
       testCase.duration,
+      testCase.rampUpStrategy ?? "",
+      testCase.preconditions,
       testCase.steps.map((step, index) => `${index + 1}. ${step}`).join("\n"),
       testCase.targetThroughput,
+      testCase.avgResponseTimeTarget ?? "",
+      testCase.p95ResponseTimeTarget ?? "",
+      testCase.p99ResponseTimeTarget ?? "",
+      testCase.errorRateTarget ?? "",
+      testCase.monitoringMetrics ?? "",
+      testCase.bottleneckAnalysis ?? "",
       testCase.actualThroughput,
       testCase.avgResponseTime,
       testCase.p95ResponseTime,
       testCase.errorRate,
+      testCase.cpuPeak ?? "",
+      testCase.memoryPeak ?? "",
       testCase.executionResult ?? "未执行",
+      testCase.notes ?? "",
     ]),
   ];
 }

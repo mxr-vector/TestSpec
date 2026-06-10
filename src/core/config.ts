@@ -50,7 +50,7 @@ export const COMPACT_TEST_CASE_FIELDS = [
 
 /** 性能测试默认配置 */
 export const PERFORMANCE_CONFIG = {
-  maxCases: 5,
-  unknownTarget: "待确认",
+  maxCases: 12,
+  maxCasesPerCategory: 4,
   pendingMetric: "待执行后填写",
 } as const;

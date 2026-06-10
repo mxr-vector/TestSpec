@@ -68,23 +68,153 @@ describe("performance cases", () => {
     const artifactPath = join(workspace.artifactsDir, WORKFLOW_FILES.performanceCases);
     const persistedCases = JSON.parse(await readFile(artifactPath, "utf8")) as typeof cases;
 
-    expect(cases).toHaveLength(5);
-    expect(persistedCases).toHaveLength(5);
-    expect(persistedCases[0]).not.toHaveProperty("scenarioId");
-    expect(persistedCases[0]).not.toHaveProperty("testPointIds");
-    expect(persistedCases[0]).not.toHaveProperty("testData");
-    expect(persistedCases[0]).not.toHaveProperty("notes");
+    expect(cases).toHaveLength(6);
+    expect(persistedCases).toHaveLength(6);
+    expect(persistedCases[0]).toHaveProperty("scenarioId", "PT-001");
+    expect(persistedCases[0]).toHaveProperty("testPointIds", ["TP-001"]);
+    expect(persistedCases[0]).toHaveProperty("testData");
+    expect(persistedCases[0]).toHaveProperty("notes");
     expect(cases[0]).toMatchObject({
       performanceType: "负载测试",
-      concurrentUsers: "待确认",
+      concurrentUsers: "50/100/200 阶梯并发，按业务峰值调整",
       actualThroughput: "待执行后填写",
+      executionResult: "未执行",
     });
-    expect(cases[0]).not.toHaveProperty("requirementIds");
-    expect(cases[0]).not.toHaveProperty("executionResult");
+    expect(cases[0]).toHaveProperty("requirementIds", ["REQ-001"]);
+    expect(cases[0]).toHaveProperty("p99ResponseTimeTarget");
+    expect(cases[0]).not.toHaveProperty("p99ResponseTime");
+    expect(cases[0]?.steps.length).toBeGreaterThan(3);
     expect(cases[0]?.performanceType).toBe("负载测试");
     expect(cases[1]?.performanceType).toBe("压力测试");
     expect(cases[2]?.performanceType).toBe("容量测试");
     expect(cases[3]?.performanceType).toBe("稳定性测试");
+  });
+
+  it("uses SLA hints from source context when generating performance cases", async () => {
+    const workspace = await createChangeWorkspace("sla-search");
+    await writeFile(
+      join(workspace.changeDir, WORKFLOW_FILES.proposal),
+      [
+        "# 测试提案：sla-search",
+        "",
+        "并发用户数：300用户",
+        "持续时间：45min",
+        "TPS：1200 QPS",
+        "平均响应时间：<= 500ms",
+        "P95响应时间：<= 900ms",
+        "P99响应时间：<= 1500ms",
+        "错误率：<= 0.05%",
+        "数据量：50万条记录",
+      ].join("\n")
+    );
+    await writeFile(
+      join(workspace.specsDir, WORKFLOW_FILES.testpoints),
+      [
+        "# 测试点清单：sla-search",
+        "",
+        "## 核心流程",
+        "",
+        "- [TP-001] 覆盖 REQ-001 商品搜索 的主要成功路径。",
+      ].join("\n")
+    );
+
+    const cases = await generatePerformanceCases(workspace);
+
+    expect(cases[0]).toMatchObject({
+      concurrentUsers: "300用户",
+      duration: "45min",
+      targetThroughput: "1200 QPS",
+      avgResponseTimeTarget: "<= 500ms",
+      p95ResponseTimeTarget: "<= 900ms",
+      p99ResponseTimeTarget: "<= 1500ms",
+      errorRateTarget: "<= 0.05%",
+    });
+    expect(cases[0]?.testData).toContain("50万条记录");
+  });
+
+  it("regenerates cached performance cases when schema is stale", async () => {
+    const workspace = await createChangeWorkspace("stale-performance-cache");
+    await writeFile(
+      join(workspace.specsDir, WORKFLOW_FILES.testpoints),
+      [
+        "# 测试点清单：stale-performance-cache",
+        "",
+        "## 核心流程",
+        "",
+        "- [TP-001] 覆盖 REQ-001 登录 的主要成功路径。",
+      ].join("\n")
+    );
+    await writeFile(
+      join(workspace.artifactsDir, WORKFLOW_FILES.performanceCases),
+      `${JSON.stringify(
+        [
+          {
+            module: "登录",
+            scenarioName: "登录性能测试",
+            performanceType: "压力测试",
+            objective: "验证登录性能。",
+            preconditions: "环境已准备。",
+            concurrentUsers: "待确认",
+            duration: "10min",
+            steps: ["执行压测"],
+            targetThroughput: "待确认",
+            actualThroughput: "待执行后填写",
+            avgResponseTime: "待执行后填写",
+            p95ResponseTime: "待执行后填写",
+            errorRate: "待执行后填写",
+          },
+        ],
+        null,
+        2
+      )}\n`
+    );
+
+    const cases = await readOrGeneratePerformanceCases(workspace);
+
+    expect(cases[0]).toHaveProperty("scenarioId", "PT-001");
+    expect(cases[0]).toHaveProperty("testPointIds", ["TP-001"]);
+    expect(cases[0]).toHaveProperty("p99ResponseTimeTarget");
+    expect(cases[0]).not.toHaveProperty("p99ResponseTime");
+  });
+
+  it("limits performance candidates per category and total cases", async () => {
+    const workspace = await createChangeWorkspace("large-candidate-set");
+    await writeFile(
+      join(workspace.specsDir, WORKFLOW_FILES.testpoints),
+      [
+        "# 测试点清单：large-candidate-set",
+        "",
+        "## 核心流程",
+        "",
+        "- [TP-001] 覆盖 REQ-001 首页核心链路 的主要成功路径。",
+        "- [TP-002] 覆盖 REQ-002 商品搜索 的主要成功路径。",
+        "- [TP-003] 覆盖 REQ-003 商品列表分页 的主要成功路径。",
+        "- [TP-004] 覆盖 REQ-004 订单查询 的主要成功路径。",
+        "- [TP-005] 覆盖 REQ-005 报表统计 的主要成功路径。",
+        "- [TP-006] 覆盖 REQ-006 高级筛选 的主要成功路径。",
+        "- [TP-007] 覆盖 REQ-007 提交订单 的主要成功路径。",
+        "- [TP-008] 覆盖 REQ-008 创建订单 的主要成功路径。",
+        "- [TP-009] 覆盖 REQ-009 支付订单 的主要成功路径。",
+        "- [TP-010] 覆盖 REQ-010 更新资料 的主要成功路径。",
+        "- [TP-011] 覆盖 REQ-011 批量导入 的主要成功路径。",
+        "- [TP-012] 覆盖 REQ-012 批量导出 的主要成功路径。",
+        "- [TP-013] 覆盖 REQ-013 文件上传 的主要成功路径。",
+        "- [TP-014] 覆盖 REQ-014 数据同步 的主要成功路径。",
+        "- [TP-015] 覆盖 REQ-015 第三方回调 的主要成功路径。",
+        "- [TP-016] 覆盖 REQ-016 消息队列通知 的主要成功路径。",
+      ].join("\n")
+    );
+
+    const cases = await generatePerformanceCases(workspace);
+    const queryCases = cases.filter((testCase) => testCase.scenarioName.includes("查询性能测试"));
+    const transactionCases = cases.filter((testCase) =>
+      testCase.scenarioName.includes("事务压力测试")
+    );
+
+    expect(cases).toHaveLength(12);
+    expect(queryCases).toHaveLength(4);
+    expect(transactionCases).toHaveLength(4);
+    expect(cases.map((testCase) => testCase.testPointIds?.[0])).not.toContain("TP-006");
   });
 
   it("refreshes performance cases when source context changes", async () => {
@@ -165,15 +295,15 @@ describe("structured cases and exports", () => {
     expect(functionalSheetXml).not.toContain("实际结果");
     expect(functionalSheetXml).not.toContain("缺陷编号");
     expect(functionalSheetXml).toContain("执行结果");
-    expect(performanceSheetXml).not.toContain("场景编号");
-    expect(performanceSheetXml).toContain("P95响应时间(ms)");
-    expect(performanceSheetXml).not.toContain("关联测试点编号");
-    expect(performanceSheetXml).not.toContain("<t>测试数据</t>");
-    expect(performanceSheetXml).not.toContain("备注");
-    expect(performanceSheetXml).not.toContain("P99响应时间(ms)");
-    expect(performanceSheetXml).not.toContain("CPU峰值(%)");
-    expect(performanceSheetXml).not.toContain("内存峰值(%)");
-    expect(performanceSheetXml).not.toContain("瓶颈分析");
+    expect(performanceSheetXml).toContain("场景编号");
+    expect(performanceSheetXml).toContain("P95响应时间目标(ms)");
+    expect(performanceSheetXml).toContain("关联测试点编号");
+    expect(performanceSheetXml).toContain("测试数据规模");
+    expect(performanceSheetXml).toContain("备注");
+    expect(performanceSheetXml).toContain("P99响应时间目标(ms)");
+    expect(performanceSheetXml).toContain("CPU峰值(%)");
+    expect(performanceSheetXml).toContain("内存峰值(MB)");
+    expect(performanceSheetXml).toContain("瓶颈观察点");
   });
 
   it("omits the performance sheet when there are no performance cases", async () => {
@@ -562,7 +692,7 @@ describe("reporting", () => {
           actualThroughput: "待执行后填写",
           avgResponseTime: "待执行后填写",
           p95ResponseTime: "待执行后填写",
-          p99ResponseTime: "待执行后填写",
+          p99ResponseTimeTarget: "待执行后填写",
           errorRate: "待执行后填写",
           cpuPeak: "待执行后填写",
           memoryPeak: "待执行后填写",

@@ -126,7 +126,7 @@ When a command accepts `[name]`, TestSpec uses the explicit name if provided. If
 | Worksheet  | Purpose                                                                                 |
 | ---------- | --------------------------------------------------------------------------------------- |
 | `功能测试` | Minimal functional test cases with steps, expected results, priority, and execution status |
-| `性能测试` | Compact performance scenarios with baseline targets, metrics, and execution status        |
+| `性能测试` | Detailed performance scenarios with IDs, linked test points, data scale, load model, target metrics, monitoring notes, and execution status |
 
 The Excel workbook is execution-oriented. Compact `artifacts/testcases.json` uses exactly the executable schema `title`, `module`, `type`, `priority`, `preconditions`, `steps`, and `expectedResult`; the CLI normalizes generated cases to that schema before validation and export.
 
