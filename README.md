@@ -18,7 +18,7 @@ TestSpec is a CLI tool that helps QA teams create, manage, and track test artifa
 ## Installation
 
 ```bash
-npm install -g @wangjh2001/testspec
+npm install -g @wangjh2001/testspec@latest
 ```
 
 Or use npx without installation:
