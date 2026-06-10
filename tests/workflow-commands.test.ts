@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../src/cli.js";
+import { WORKFLOW_FILES, WORKSPACE_CONFIG } from "../src/core/config.js";
 
 let originalCwd: string;
 let tempDir: string;
@@ -72,15 +73,34 @@ describe("workflow command actions", () => {
     await program.parseAsync(["points", "login-v2"], { from: "user" });
 
     const proposal = await readFile(
-      join(tempDir, "testspec", "changes", "login-v2", "proposal.md"),
+      join(
+        tempDir,
+        WORKSPACE_CONFIG.root,
+        WORKSPACE_CONFIG.changesDir,
+        "login-v2",
+        WORKFLOW_FILES.proposal
+      ),
       "utf8"
     );
     const analysis = await readFile(
-      join(tempDir, "testspec", "changes", "login-v2", "requirements-analysis.md"),
+      join(
+        tempDir,
+        WORKSPACE_CONFIG.root,
+        WORKSPACE_CONFIG.changesDir,
+        "login-v2",
+        WORKFLOW_FILES.requirementsAnalysis
+      ),
       "utf8"
     );
     const points = await readFile(
-      join(tempDir, "testspec", "changes", "login-v2", "specs", "testpoints.md"),
+      join(
+        tempDir,
+        WORKSPACE_CONFIG.root,
+        WORKSPACE_CONFIG.changesDir,
+        "login-v2",
+        WORKSPACE_CONFIG.specsDir,
+        WORKFLOW_FILES.testpoints
+      ),
       "utf8"
     );
 

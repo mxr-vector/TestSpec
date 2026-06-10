@@ -2,6 +2,7 @@ import { mkdir, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { WORKSPACE_CONFIG } from "../src/core/config.js";
 import { TestSpecError } from "../src/core/errors.js";
 import { normalizeChangeName } from "../src/workflow/names.js";
 import {
@@ -60,6 +61,10 @@ describe("change workspace", () => {
   it("builds paths under testspec changes", () => {
     const workspace = buildChangeWorkspace("login-v2");
 
-    expect(workspace.changeDir.endsWith(join("testspec", "changes", "login-v2"))).toBe(true);
+    expect(
+      workspace.changeDir.endsWith(
+        join(WORKSPACE_CONFIG.root, WORKSPACE_CONFIG.changesDir, "login-v2")
+      )
+    ).toBe(true);
   });
 });

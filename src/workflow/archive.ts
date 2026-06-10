@@ -1,12 +1,12 @@
 /**
  * @fileoverview TestSpec 归档模块
- * 
+ *
  * 该模块实现了测试变更的归档功能，包括：
  * 1. 生成 manifest.json 清单文件
  * 2. 将测试变更目录移动到归档目录
  * 3. 支持跨文件系统的复制+删除操作
  * 4. 记录归档时间、关联需求文档、产物列表和报告摘要
- * 
+ *
  * 归档目录结构：
  * testspec/changes/archive/
  *   └── <date>-<name>/
@@ -21,7 +21,7 @@
  *       │   ├── <name>_cases.xlsx
  *       │   └── <name>_cases.xmind
  *       └── report.md
- * 
+ *
  * manifest.json 包含：
  * - name: 测试变更名称
  * - archivedAt: 归档日期（YYYY-MM-DD 格式）
@@ -32,6 +32,7 @@
 
 import { cp, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { basename, join, relative } from "node:path";
+import { WORKFLOW_FILES } from "../core/config.js";
 import { TestSpecError } from "../core/errors.js";
 import { readReportSummary } from "./report.js";
 import type { ChangeWorkspace } from "./workspace.js";
@@ -39,7 +40,7 @@ import { getArchiveRoot, pathExists } from "./workspace.js";
 
 /**
  * 归档清单接口
- * 
+ *
  * @interface ArchiveManifest
  * @property {string} name - 测试变更名称
  * @property {string} archivedAt - 归档日期（YYYY-MM-DD 格式）
@@ -57,7 +58,7 @@ export interface ArchiveManifest {
 
 /**
  * 归档测试变更
- * 
+ *
  * 该函数负责：
  * 1. 生成归档目录路径（格式：archive/<date>-<name>）
  * 2. 检查归档目录是否已存在（避免覆盖）
@@ -65,14 +66,14 @@ export interface ArchiveManifest {
  * 4. 生成 manifest.json 清单文件
  * 5. 移动测试变更目录到归档目录
  * 6. 如果移动失败（跨文件系统），使用复制+删除的方式
- * 
+ *
  * @param {ChangeWorkspace} workspace - 测试变更工作区对象
  * @param {Object} [options] - 可选配置
  * @param {Date} [options.date] - 归档日期，默认为当前日期
  * @param {string} [options.cwd] - 工作目录，默认为 process.cwd()
  * @returns {Promise<string>} 归档目录的绝对路径
  * @throws {TestSpecError} 如果归档目录已存在
- * 
+ *
  * @example
  * ```typescript
  * const archivePath = await archiveChange(workspace);
@@ -133,7 +134,7 @@ export async function writeManifest(
   if (requirement) {
     manifest.requirement = requirement;
   }
-  const manifestPath = join(directory, "manifest.json");
+  const manifestPath = join(directory, WORKFLOW_FILES.manifest);
 
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
@@ -142,7 +143,7 @@ export async function writeManifest(
 
 async function readRequirementReference(directory: string): Promise<string | undefined> {
   try {
-    const proposal = await readFile(join(directory, "proposal.md"), "utf8");
+    const proposal = await readFile(join(directory, WORKFLOW_FILES.proposal), "utf8");
     const match = /## 关联需求文档\s+([^#]+)/.exec(proposal);
     return match?.[1]?.trim().split(/\r?\n/)[0]?.trim();
   } catch {
@@ -160,7 +161,7 @@ async function listArtifacts(directory: string): Promise<string[]> {
       const path = join(current, entry.name);
       if (entry.isDirectory()) {
         await visit(path);
-      } else if (entry.name !== "manifest.json") {
+      } else if (entry.name !== WORKFLOW_FILES.manifest) {
         files.push(relative(directory, path));
       }
     }

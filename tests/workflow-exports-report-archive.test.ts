@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { strFromU8, unzipSync } from "fflate";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { EXPORT_FILE_SUFFIXES, WORKFLOW_FILES, WORKSPACE_CONFIG } from "../src/core/config.js";
 import { archiveChange } from "../src/workflow/archive.js";
 import { writeProposal, writeTestPoints } from "../src/workflow/artifacts.js";
 import {
@@ -48,7 +49,7 @@ describe("performance cases", () => {
   it("generates compact performance cases from keyword rules", async () => {
     const workspace = await createChangeWorkspace("checkout-v2");
     await writeFile(
-      join(workspace.specsDir, "testpoints.md"),
+      join(workspace.specsDir, WORKFLOW_FILES.testpoints),
       [
         "# 测试点清单：checkout-v2",
         "",
@@ -64,7 +65,7 @@ describe("performance cases", () => {
     );
 
     const cases = await generatePerformanceCases(workspace);
-    const artifactPath = join(workspace.artifactsDir, "performance-cases.json");
+    const artifactPath = join(workspace.artifactsDir, WORKFLOW_FILES.performanceCases);
     const persistedCases = JSON.parse(await readFile(artifactPath, "utf8")) as typeof cases;
 
     expect(cases).toHaveLength(5);
@@ -89,7 +90,7 @@ describe("performance cases", () => {
   it("refreshes performance cases when source context changes", async () => {
     const workspace = await createChangeWorkspace("search-v2");
     await writeFile(
-      join(workspace.specsDir, "testpoints.md"),
+      join(workspace.specsDir, WORKFLOW_FILES.testpoints),
       [
         "# 测试点清单：search-v2",
         "",
@@ -100,7 +101,7 @@ describe("performance cases", () => {
     );
     await generatePerformanceCases(workspace);
     await writeFile(
-      join(workspace.specsDir, "testpoints.md"),
+      join(workspace.specsDir, WORKFLOW_FILES.testpoints),
       [
         "# 测试点清单：search-v2",
         "",
@@ -123,7 +124,7 @@ describe("structured cases and exports", () => {
 
     const cases = await generateStructuredCases(workspace);
     const performanceCases = await generatePerformanceCases(workspace);
-    const workbookPath = join(workspace.artifactsDir, "login-v2_cases.xlsx");
+    const workbookPath = join(workspace.artifactsDir, `login-v2${EXPORT_FILE_SUFFIXES.excelCases}`);
     await writeExcelWorkbook(workbookPath, cases, performanceCases);
     const rows = await readExecutionRows(workbookPath);
     const workbook = unzipSync(await readFile(workbookPath));
@@ -141,7 +142,9 @@ describe("structured cases and exports", () => {
     expect(workbookXml).toContain('name="性能测试"');
     expect(relationshipsXml).toContain('Target="worksheets/sheet1.xml"');
     expect(relationshipsXml).toContain('Target="worksheets/sheet2.xml"');
-    expect(relationshipsXml).toContain('Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"');
+    expect(relationshipsXml).toContain(
+      'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles"'
+    );
     expect(relationshipsXml).toContain('Target="styles.xml"');
     expect(contentTypesXml).toContain("/xl/styles.xml");
     expect(contentTypesXml).toContain("/xl/worksheets/sheet2.xml");
@@ -175,7 +178,10 @@ describe("structured cases and exports", () => {
 
   it("omits the performance sheet when there are no performance cases", async () => {
     const workspace = await createChangeWorkspace("functional-only");
-    const workbookPath = join(workspace.artifactsDir, "functional-only_cases.xlsx");
+    const workbookPath = join(
+      workspace.artifactsDir,
+      `functional-only${EXPORT_FILE_SUFFIXES.excelCases}`
+    );
     await writeExcelWorkbook(
       workbookPath,
       [
@@ -216,7 +222,7 @@ describe("structured cases and exports", () => {
     await writeTestPoints(workspace);
     await generateStructuredCases(workspace);
     await writeFile(
-      join(workspace.artifactsDir, "testcases.json"),
+      join(workspace.artifactsDir, WORKFLOW_FILES.testcases),
       `${JSON.stringify(
         [
           {
@@ -237,13 +243,13 @@ describe("structured cases and exports", () => {
       )}\n`
     );
     await writeFile(
-      join(workspace.specsDir, "testpoints.md"),
+      join(workspace.specsDir, WORKFLOW_FILES.testpoints),
       ["# 测试点清单：login-v2", "", "## 核心流程", "", "- [TP-001] 新成功路径。"].join("\n")
     );
 
     const cases = await readOrGenerateStructuredCases(workspace);
     const persisted = JSON.parse(
-      await readFile(join(workspace.artifactsDir, "testcases.json"), "utf8")
+      await readFile(join(workspace.artifactsDir, WORKFLOW_FILES.testcases), "utf8")
     ) as Record<string, unknown>[];
 
     expect(cases[0]).toMatchObject({ title: "已有成功路径" });
@@ -263,7 +269,7 @@ describe("validation", () => {
   it("passes valid agent-generated cases and preserves them for exports", async () => {
     const workspace = await createChangeWorkspace("agent-login");
     await writeFile(
-      join(workspace.specsDir, "testpoints.md"),
+      join(workspace.specsDir, WORKFLOW_FILES.testpoints),
       [
         "# 测试点清单：agent-login",
         "",
@@ -273,7 +279,7 @@ describe("validation", () => {
       ].join("\n")
     );
     await writeFile(
-      join(workspace.artifactsDir, "testcases.json"),
+      join(workspace.artifactsDir, WORKFLOW_FILES.testcases),
       `${JSON.stringify(
         [
           {
@@ -307,7 +313,10 @@ describe("validation", () => {
 
     const validation = await validateWorkflowArtifacts(workspace);
     const cases = await readOrGenerateStructuredCases(workspace);
-    const workbookPath = join(workspace.artifactsDir, "agent-login_cases.xlsx");
+    const workbookPath = join(
+      workspace.artifactsDir,
+      `agent-login${EXPORT_FILE_SUFFIXES.excelCases}`
+    );
     await writeExcelWorkbook(workbookPath, cases, []);
     const workbook = unzipSync(await readFile(workbookPath));
     const functionalSheetXml = strFromU8(workbookEntry(workbook, "xl/worksheets/sheet1.xml"));
@@ -324,7 +333,7 @@ describe("validation", () => {
   it("reports schema and quality validation issues after compact normalization", async () => {
     const workspace = await createChangeWorkspace("bad-cases");
     await writeFile(
-      join(workspace.specsDir, "testpoints.md"),
+      join(workspace.specsDir, WORKFLOW_FILES.testpoints),
       [
         "# 测试点清单：bad-cases",
         "",
@@ -335,7 +344,7 @@ describe("validation", () => {
       ].join("\n")
     );
     await writeFile(
-      join(workspace.artifactsDir, "testcases.json"),
+      join(workspace.artifactsDir, WORKFLOW_FILES.testcases),
       `${JSON.stringify(
         [
           {
@@ -373,7 +382,7 @@ describe("validation", () => {
     const output = formatValidationResult(validation);
 
     const persistedAfterValidation = JSON.parse(
-      await readFile(join(workspace.artifactsDir, "testcases.json"), "utf8")
+      await readFile(join(workspace.artifactsDir, WORKFLOW_FILES.testcases), "utf8")
     ) as Record<string, unknown>[];
 
     expect(validation.errors.some((issue) => issue.code === "MISSING_FIELD")).toBe(false);
@@ -387,7 +396,7 @@ describe("validation", () => {
 
     await readOrGenerateStructuredCases(workspace);
     const persistedAfterNormalization = JSON.parse(
-      await readFile(join(workspace.artifactsDir, "testcases.json"), "utf8")
+      await readFile(join(workspace.artifactsDir, WORKFLOW_FILES.testcases), "utf8")
     ) as Record<string, unknown>[];
     expect(persistedAfterNormalization[0]).not.toHaveProperty("caseId");
 
@@ -399,7 +408,7 @@ describe("validation", () => {
   it("does not cascade unknown test point errors when testpoints are unreadable", async () => {
     const workspace = await createChangeWorkspace("missing-testpoints");
     await writeFile(
-      join(workspace.artifactsDir, "testcases.json"),
+      join(workspace.artifactsDir, WORKFLOW_FILES.testcases),
       `${JSON.stringify(
         [
           {
@@ -431,7 +440,7 @@ describe("validation", () => {
   it("warns when many cases have near-identical steps", async () => {
     const workspace = await createChangeWorkspace("duplicate-cases");
     await writeFile(
-      join(workspace.specsDir, "testpoints.md"),
+      join(workspace.specsDir, WORKFLOW_FILES.testpoints),
       [
         "# 测试点清单：duplicate-cases",
         "",
@@ -443,7 +452,7 @@ describe("validation", () => {
       ].join("\n")
     );
     await writeFile(
-      join(workspace.artifactsDir, "testcases.json"),
+      join(workspace.artifactsDir, WORKFLOW_FILES.testcases),
       `${JSON.stringify(
         ["001", "002", "003"].map((id, index) => ({
           caseId: `TC-${id}`,
@@ -514,7 +523,7 @@ describe("reporting", () => {
 
   it("writes a report from Excel execution rows", async () => {
     const workspace = await createChangeWorkspace("login-v2");
-    const workbookPath = join(workspace.artifactsDir, "login-v2_cases.xlsx");
+    const workbookPath = join(workspace.artifactsDir, `login-v2${EXPORT_FILE_SUFFIXES.excelCases}`);
     await writeExcelWorkbook(
       workbookPath,
       [
@@ -576,20 +585,32 @@ describe("archive", () => {
   it("moves the change and writes a manifest", async () => {
     const workspace = await createChangeWorkspace("login-v2");
     await writeProposal(workspace, { requirement: "docs/login.md" });
-    await writeFile(join(workspace.changeDir, "report.md"), "| 总用例数 | 1 |\n| 通过 | 1 |\n");
+    await writeFile(
+      join(workspace.changeDir, WORKFLOW_FILES.report),
+      "| 总用例数 | 1 |\n| 通过 | 1 |\n"
+    );
 
     const archivePath = await archiveChange(workspace, { date: new Date("2026-06-04T00:00:00Z") });
-    const manifest = JSON.parse(await readFile(join(archivePath, "manifest.json"), "utf8")) as {
+    const manifest = JSON.parse(
+      await readFile(join(archivePath, WORKFLOW_FILES.manifest), "utf8")
+    ) as {
       name: string;
       requirement: string;
       artifacts: string[];
     };
 
     expect(
-      archivePath.endsWith(join("testspec", "changes", "archive", "2026-06-04-login-v2"))
+      archivePath.endsWith(
+        join(
+          WORKSPACE_CONFIG.root,
+          WORKSPACE_CONFIG.changesDir,
+          WORKSPACE_CONFIG.archiveDir,
+          "2026-06-04-login-v2"
+        )
+      )
     ).toBe(true);
     expect(manifest.name).toBe("login-v2");
     expect(manifest.requirement).toBe("docs/login.md");
-    expect(manifest.artifacts).toContain("proposal.md");
+    expect(manifest.artifacts).toContain(WORKFLOW_FILES.proposal);
   });
 });

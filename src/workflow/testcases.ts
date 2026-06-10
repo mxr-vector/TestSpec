@@ -1,12 +1,12 @@
 /**
  * @fileoverview TestSpec 结构化测试用例生成模块
- * 
+ *
  * 该模块实现了结构化测试用例的生成功能，包括：
  * 1. 从测试点生成结构化测试用例
  * 2. 支持紧凑格式（compact）的测试用例 schema
  * 3. 提供测试用例的读取、生成、规范化和持久化功能
  * 4. 支持智能缓存策略，避免不必要的重复生成
- * 
+ *
  * 紧凑测试用例 schema（7 个必需字段）：
  * - title: 用例名称
  * - module: 功能模块
@@ -15,7 +15,7 @@
  * - preconditions: 前置条件
  * - steps: 测试步骤（字符串数组）
  * - expectedResult: 预期结果
- * 
+ *
  * 测试用例类型推断规则：
  * - 包含"负向"的章节 → 负向
  * - 包含"边界"的章节 → 边界
@@ -26,29 +26,20 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { COMPACT_TEST_CASE_FIELDS, WORKFLOW_FILES, WORKSPACE_CONFIG } from "../core/config.js";
 import type { ChangeWorkspace } from "./workspace.js";
 
-/**
- * 紧凑测试用例字段常量
- * 
- * 定义了紧凑格式测试用例的 7 个必需字段，用于：
- * 1. 验证测试用例 schema 的完整性
- * 2. 规范化测试用例格式
- * 3. 生成模板化的测试用例
- */
-export const COMPACT_TEST_CASE_FIELDS = [
-  "title",
-  "module",
-  "type",
-  "priority",
-  "preconditions",
-  "steps",
-  "expectedResult",
-] as const;
+export class TestCaseFormatError extends Error {
+  readonly code = "TESTCASES_NOT_ARRAY";
+
+  constructor() {
+    super(`${WORKSPACE_CONFIG.artifactsDir}/${WORKFLOW_FILES.testcases} must be a JSON array.`);
+  }
+}
 
 /**
  * 测试用例接口
- * 
+ *
  * @interface TestCase
  * @property {string} title - 用例名称，描述测试场景
  * @property {string} module - 功能模块，用于分类和统计
@@ -76,13 +67,13 @@ interface TestPoint {
 
 /**
  * 生成结构化测试用例
- * 
+ *
  * 该函数负责：
  * 1. 读取测试点清单（specs/testpoints.md）
  * 2. 解析测试点，提取 ID、标题和章节
  * 3. 为每个测试点生成对应的测试用例
  * 4. 将结果写入 testcases.json 文件
- * 
+ *
  * 测试用例生成规则：
  * - 用例名称：使用测试点标题
  * - 功能模块：使用测试点所属章节
@@ -91,10 +82,10 @@ interface TestPoint {
  * - 前置条件：模板化文本，待根据需求补充
  * - 测试步骤：模板化步骤，待根据需求补充
  * - 预期结果：模板化文本，待根据需求补充
- * 
+ *
  * @param {ChangeWorkspace} workspace - 测试变更工作区对象
  * @returns {Promise<TestCase[]>} 生成的测试用例数组
- * 
+ *
  * @example
  * ```typescript
  * const cases = await generateStructuredCases(workspace);
@@ -103,7 +94,7 @@ interface TestPoint {
  */
 export async function generateStructuredCases(workspace: ChangeWorkspace): Promise<TestCase[]> {
   // 读取测试点清单
-  const testpointsPath = join(workspace.specsDir, "testpoints.md");
+  const testpointsPath = join(workspace.specsDir, WORKFLOW_FILES.testpoints);
   const content = await readFile(testpointsPath, "utf8");
 
   // 解析测试点
@@ -113,7 +104,7 @@ export async function generateStructuredCases(workspace: ChangeWorkspace): Promi
   const cases = points.map((point, index) => createCaseFromPoint(point, index));
 
   // 写入 JSON 文件
-  const outputPath = join(workspace.artifactsDir, "testcases.json");
+  const outputPath = join(workspace.artifactsDir, WORKFLOW_FILES.testcases);
   await writeFile(outputPath, `${JSON.stringify(cases, null, 2)}\n`);
 
   return cases;
@@ -126,7 +117,7 @@ export async function readCompactStructuredCases(workspace: ChangeWorkspace): Pr
 export async function normalizeAndPersistCompactCases(
   workspace: ChangeWorkspace
 ): Promise<TestCase[]> {
-  const testcasesPath = join(workspace.artifactsDir, "testcases.json");
+  const testcasesPath = join(workspace.artifactsDir, WORKFLOW_FILES.testcases);
   const parsed = await readStructuredCaseArray(workspace);
   const cases = compactParsedCases(parsed);
 
@@ -153,11 +144,11 @@ export async function readOrGenerateStructuredCases(
 }
 
 async function readStructuredCaseArray(workspace: ChangeWorkspace): Promise<unknown[]> {
-  const testcasesPath = join(workspace.artifactsDir, "testcases.json");
+  const testcasesPath = join(workspace.artifactsDir, WORKFLOW_FILES.testcases);
   const parsed = JSON.parse(await readFile(testcasesPath, "utf8")) as unknown;
 
   if (!Array.isArray(parsed)) {
-    throw new Error("artifacts/testcases.json must be a JSON array.");
+    throw new TestCaseFormatError();
   }
 
   return parsed;

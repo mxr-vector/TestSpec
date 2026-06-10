@@ -8,10 +8,8 @@
  * 4. 在网络异常时保持静默，不影响主命令执行
  */
 
+import { UPDATE_CHECK_CONFIG } from "../core/config.js";
 import { getPackageInfo } from "./package-info.js";
-
-const DEFAULT_NPM_REGISTRY_URL = "https://registry.npmjs.org";
-const DEFAULT_TIMEOUT_MS = 1500;
 
 /**
  * npm 更新检查结果。
@@ -92,7 +90,10 @@ async function fetchLatestNpmVersion(
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+  const timeout = setTimeout(
+    () => controller.abort(),
+    options.timeoutMs ?? UPDATE_CHECK_CONFIG.defaultTimeoutMs
+  );
 
   try {
     const response = await fetchImpl(buildNpmLatestUrl(packageName, options.registryUrl), {
@@ -112,13 +113,16 @@ async function fetchLatestNpmVersion(
   }
 }
 
-function buildNpmLatestUrl(packageName: string, registryUrl = DEFAULT_NPM_REGISTRY_URL): string {
+function buildNpmLatestUrl(
+  packageName: string,
+  registryUrl: string = UPDATE_CHECK_CONFIG.defaultNpmRegistryUrl
+): string {
   const normalizedRegistryUrl = registryUrl.replace(/\/+$/, "");
   return `${normalizedRegistryUrl}/${encodeURIComponent(packageName)}/latest`;
 }
 
 function isUpdateCheckDisabled(): boolean {
-  const value = process.env.TESTSPEC_SKIP_UPDATE_CHECK;
+  const value = process.env[UPDATE_CHECK_CONFIG.skipEnvVar];
   return value === "1" || value === "true";
 }
 

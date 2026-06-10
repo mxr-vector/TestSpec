@@ -1,6 +1,6 @@
 /**
  * @fileoverview TestSpec 工作流验证模块
- * 
+ *
  * 该模块实现了工作流产物的验证功能，包括：
  * 1. 验证测试点清单（specs/testpoints.md）的可读性和格式
  * 2. 验证测试用例（artifacts/testcases.json）的 schema 和质量
@@ -8,11 +8,11 @@
  * 4. 检查步骤是否过于模板化
  * 5. 检查预期结果是否过于模糊
  * 6. 检查是否存在重复用例
- * 
+ *
  * 验证结果分为两类：
  * - error: 阻塞错误，必须修复后才能继续
  * - warning: 审查警告，建议修复但不阻塞
- * 
+ *
  * 验证规则：
  * - schema 验证：检查 7 个必需字段是否存在且格式正确
  * - 质量验证：检查步骤和预期结果是否过于模板化
@@ -21,12 +21,13 @@
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { readCompactStructuredCases, type TestCase } from "./testcases.js";
+import { WORKFLOW_FILES, WORKSPACE_CONFIG } from "../core/config.js";
+import { readCompactStructuredCases, type TestCase, TestCaseFormatError } from "./testcases.js";
 import type { ChangeWorkspace } from "./workspace.js";
 
 /**
  * 验证级别类型
- * 
+ *
  * @type ValidationLevel
  * - "error": 阻塞错误，必须修复后才能继续
  * - "warning": 审查警告，建议修复但不阻塞
@@ -35,7 +36,7 @@ export type ValidationLevel = "error" | "warning";
 
 /**
  * 验证问题接口
- * 
+ *
  * @interface ValidationIssue
  * @property {ValidationLevel} level - 验证级别（error 或 warning）
  * @property {string} code - 问题代码（如 MISSING_FIELD、GENERIC_STEPS 等）
@@ -51,7 +52,7 @@ export interface ValidationIssue {
 
 /**
  * 验证结果接口
- * 
+ *
  * @interface ValidationResult
  * @property {ValidationIssue[]} errors - 阻塞错误列表
  * @property {ValidationIssue[]} warnings - 审查警告列表
@@ -86,21 +87,21 @@ const VAGUE_EXPECTED_RESULT_PATTERNS = [
 
 /**
  * 验证工作流产物
- * 
+ *
  * 该函数负责验证工作流中的所有产物，包括：
  * 1. 读取测试点清单（specs/testpoints.md）
  * 2. 读取测试用例（artifacts/testcases.json）
  * 3. 验证测试用例的 schema（7 个必需字段）
  * 4. 验证测试用例的质量（步骤、预期结果）
  * 5. 将问题分为错误和警告两类
- * 
+ *
  * 验证级别：
  * - error: 阻塞错误，如缺少必需字段、文件不可读等
  * - warning: 审查警告，如步骤过于模板化、预期结果过于模糊等
- * 
+ *
  * @param {ChangeWorkspace} workspace - 测试变更工作区对象
  * @returns {Promise<ValidationResult>} 验证结果，包含错误和警告列表
- * 
+ *
  * @example
  * ```typescript
  * const result = await validateWorkflowArtifacts(workspace);
@@ -159,10 +160,14 @@ async function readTestCases(
     return await readCompactStructuredCases(workspace);
   } catch (errorValue) {
     const message = errorMessage(errorValue);
-    const code = message.includes("must be a JSON array")
-      ? "TESTCASES_NOT_ARRAY"
-      : "TESTCASES_UNREADABLE";
-    issues.push(error(code, `Unable to read or parse artifacts/testcases.json: ${message}`));
+    const code =
+      errorValue instanceof TestCaseFormatError ? errorValue.code : "TESTCASES_UNREADABLE";
+    issues.push(
+      error(
+        code,
+        `Unable to read or parse ${WORKSPACE_CONFIG.artifactsDir}/${WORKFLOW_FILES.testcases}: ${message}`
+      )
+    );
     return [];
   }
 }
@@ -171,7 +176,7 @@ async function readTestPoints(
   workspace: ChangeWorkspace,
   issues: ValidationIssue[]
 ): Promise<ParsedTestPoint[]> {
-  const testpointsPath = join(workspace.specsDir, "testpoints.md");
+  const testpointsPath = join(workspace.specsDir, WORKFLOW_FILES.testpoints);
 
   try {
     return parseTestPointTraceability(await readFile(testpointsPath, "utf8"));
@@ -179,7 +184,7 @@ async function readTestPoints(
     issues.push(
       error(
         "TESTPOINTS_UNREADABLE",
-        `Unable to read specs/testpoints.md: ${errorMessage(errorValue)}`
+        `Unable to read ${WORKSPACE_CONFIG.specsDir}/${WORKFLOW_FILES.testpoints}: ${errorMessage(errorValue)}`
       )
     );
     return [];

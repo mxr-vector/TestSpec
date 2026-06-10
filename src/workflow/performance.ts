@@ -1,18 +1,18 @@
 /**
  * @fileoverview TestSpec 性能测试用例生成模块
- * 
+ *
  * 该模块实现了性能测试用例的自动生成功能，包括：
  * 1. 从测试点中推断性能测试场景
  * 2. 根据场景类型生成对应的性能测试配置
  * 3. 支持多种性能测试类型：负载测试、压力测试、容量测试、稳定性测试
  * 4. 自动生成性能测试用例 JSON 文件
- * 
+ *
  * 性能测试类型：
  * - 负载测试（query/core）：验证查询和核心链路在目标并发下的响应时间、吞吐量和错误率
  * - 压力测试（transaction）：验证事务操作在逐步加压下的吞吐上限和事务成功率
  * - 容量测试（batch）：验证批量操作在指定数据规模下的处理耗时和资源消耗
  * - 稳定性测试（dependency）：验证依赖服务波动时的响应时间、失败率和降级行为
- * 
+ *
  * 推断规则：
  * - 基于测试点标题和章节关键词进行分类
  * - 核心流程测试点优先级最高
@@ -21,20 +21,12 @@
 
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { PERFORMANCE_CONFIG, WORKFLOW_FILES } from "../core/config.js";
 import type { ChangeWorkspace } from "./workspace.js";
-
-/** 最大性能测试用例数量 */
-const MAX_PERFORMANCE_CASES = 5;
-
-/** 未知目标占位符 */
-const UNKNOWN_TARGET = "待确认";
-
-/** 待填写指标占位符 */
-const PENDING_METRIC = "待执行后填写";
 
 /**
  * 性能测试用例接口
- * 
+ *
  * @interface PerformanceCase
  * @property {string} module - 业务模块名称
  * @property {string} scenarioName - 性能测试场景名称
@@ -112,24 +104,24 @@ const CATEGORY_KEYWORDS: Record<Exclude<PerformanceCategory, "core">, string[]> 
 
 /**
  * 生成性能测试用例
- * 
+ *
  * 该函数负责：
  * 1. 读取性能测试上下文（测试点、需求分析、测试提案）
  * 2. 从测试点中推断性能测试候选场景
  * 3. 根据优先级选择最多 5 个场景
  * 4. 为每个场景生成性能测试用例配置
  * 5. 将结果写入 performance-cases.json 文件
- * 
+ *
  * 推断逻辑：
  * - 核心流程测试点优先级最高
  * - 查询类场景（查询、搜索、筛选等）优先级次之
  * - 事务类场景（提交、创建、保存等）再次之
  * - 批量类场景（批量、导入、导出等）再次之
  * - 依赖类场景（第三方、接口、回调等）优先级最低
- * 
+ *
  * @param {ChangeWorkspace} workspace - 测试变更工作区对象
  * @returns {Promise<PerformanceCase[]>} 生成的性能测试用例数组
- * 
+ *
  * @example
  * ```typescript
  * const performanceCases = await generatePerformanceCases(workspace);
@@ -146,10 +138,10 @@ export async function generatePerformanceCases(
   const candidates = inferPerformanceCandidates(context.testpoints, context.combinedText);
 
   // 选择优先级最高的场景（最多 5 个）
-  const cases = candidates.slice(0, MAX_PERFORMANCE_CASES).map(createPerformanceCase);
+  const cases = candidates.slice(0, PERFORMANCE_CONFIG.maxCases).map(createPerformanceCase);
 
   // 写入 JSON 文件
-  const outputPath = join(workspace.artifactsDir, "performance-cases.json");
+  const outputPath = join(workspace.artifactsDir, WORKFLOW_FILES.performanceCases);
   await writeFile(outputPath, `${JSON.stringify(cases, null, 2)}\n`);
 
   return cases;
@@ -157,7 +149,7 @@ export async function generatePerformanceCases(
 
 /**
  * 读取或生成性能测试用例
- * 
+ *
  * 该函数实现了智能的缓存策略：
  * 1. 首先尝试读取已有的 performance-cases.json 文件
  * 2. 如果文件存在且非空，检查是否需要重新生成：
@@ -165,15 +157,15 @@ export async function generatePerformanceCases(
  *    - 如果源文件比性能测试用例文件更新，则重新生成
  *    - 否则返回缓存的用例
  * 3. 如果文件不存在、为空或格式错误，则重新生成
- * 
+ *
  * 这种策略确保：
  * - 性能测试用例始终与最新的测试点保持同步
  * - 避免不必要的重复生成
  * - 支持增量更新
- * 
+ *
  * @param {ChangeWorkspace} workspace - 测试变更工作区对象
  * @returns {Promise<PerformanceCase[]>} 性能测试用例数组
- * 
+ *
  * @example
  * ```typescript
  * const performanceCases = await readOrGeneratePerformanceCases(workspace);
@@ -183,11 +175,11 @@ export async function generatePerformanceCases(
 export async function readOrGeneratePerformanceCases(
   workspace: ChangeWorkspace
 ): Promise<PerformanceCase[]> {
-  const outputPath = join(workspace.artifactsDir, "performance-cases.json");
+  const outputPath = join(workspace.artifactsDir, WORKFLOW_FILES.performanceCases);
   const sourcePaths = [
-    join(workspace.changeDir, "proposal.md"),
-    join(workspace.changeDir, "requirements-analysis.md"),
-    join(workspace.specsDir, "testpoints.md"),
+    join(workspace.changeDir, WORKFLOW_FILES.proposal),
+    join(workspace.changeDir, WORKFLOW_FILES.requirementsAnalysis),
+    join(workspace.specsDir, WORKFLOW_FILES.testpoints),
   ];
 
   try {
@@ -222,9 +214,11 @@ async function readPerformanceContext(workspace: ChangeWorkspace): Promise<{
   testpoints: TestPoint[];
   combinedText: string;
 }> {
-  const proposal = await readOptional(join(workspace.changeDir, "proposal.md"));
-  const analysis = await readOptional(join(workspace.changeDir, "requirements-analysis.md"));
-  const testpointsContent = await readOptional(join(workspace.specsDir, "testpoints.md"));
+  const proposal = await readOptional(join(workspace.changeDir, WORKFLOW_FILES.proposal));
+  const analysis = await readOptional(
+    join(workspace.changeDir, WORKFLOW_FILES.requirementsAnalysis)
+  );
+  const testpointsContent = await readOptional(join(workspace.specsDir, WORKFLOW_FILES.testpoints));
   const testpoints = parseTestPoints(testpointsContent);
 
   return {
@@ -339,14 +333,14 @@ function createPerformanceCase(candidate: PerformanceCandidate): PerformanceCase
     performanceType: config.performanceType,
     objective: config.objective,
     preconditions: "测试环境、账号、监控和依赖服务已准备。",
-    concurrentUsers: UNKNOWN_TARGET,
+    concurrentUsers: PERFORMANCE_CONFIG.unknownTarget,
     duration: "10min",
     steps: ["准备压测脚本", "按目标负载执行压测", "记录吞吐、响应时间和错误率"],
-    targetThroughput: UNKNOWN_TARGET,
-    actualThroughput: PENDING_METRIC,
-    avgResponseTime: PENDING_METRIC,
-    p95ResponseTime: PENDING_METRIC,
-    errorRate: PENDING_METRIC,
+    targetThroughput: PERFORMANCE_CONFIG.unknownTarget,
+    actualThroughput: PERFORMANCE_CONFIG.pendingMetric,
+    avgResponseTime: PERFORMANCE_CONFIG.pendingMetric,
+    p95ResponseTime: PERFORMANCE_CONFIG.pendingMetric,
+    errorRate: PERFORMANCE_CONFIG.pendingMetric,
   };
 }
 

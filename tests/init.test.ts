@@ -6,6 +6,7 @@ import { Command } from "commander";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createProgram } from "../src/cli.js";
 import { registerInitCommand } from "../src/commands/init.js";
+import { WORKSPACE_CONFIG } from "../src/core/config.js";
 import {
   createAgentSelectionItems,
   GENERATED_FILE_MARKER,
@@ -56,7 +57,16 @@ describe("registerInitCommand", () => {
 
     expect(fetchSpy).toHaveBeenCalled();
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Initialized TestSpec workspace."));
-    await expect(stat(join(tempDir, "testspec", "changes", "archive"))).resolves.toMatchObject({});
+    await expect(
+      stat(
+        join(
+          tempDir,
+          WORKSPACE_CONFIG.root,
+          WORKSPACE_CONFIG.changesDir,
+          WORKSPACE_CONFIG.archiveDir
+        )
+      )
+    ).resolves.toMatchObject({});
   });
 
   it("prints an npm update hint after initializing when latest is newer", async () => {
@@ -87,8 +97,10 @@ describe("initializeTestSpec", () => {
   it("creates workspace directories", async () => {
     await initializeTestSpec({ agents: "claude" });
 
-    const changes = await stat(join(tempDir, "testspec", "changes"));
-    const archive = await stat(join(tempDir, "testspec", "changes", "archive"));
+    const changes = await stat(join(tempDir, WORKSPACE_CONFIG.root, WORKSPACE_CONFIG.changesDir));
+    const archive = await stat(
+      join(tempDir, WORKSPACE_CONFIG.root, WORKSPACE_CONFIG.changesDir, WORKSPACE_CONFIG.archiveDir)
+    );
 
     expect(changes.isDirectory()).toBe(true);
     expect(archive.isDirectory()).toBe(true);

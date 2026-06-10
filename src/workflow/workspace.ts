@@ -1,12 +1,12 @@
 /**
  * @fileoverview TestSpec 工作区管理模块
- * 
+ *
  * 该模块实现了 TestSpec 工作区的管理功能，包括：
  * 1. 工作区目录结构的定义和解析
  * 2. 测试变更工作区的创建和解析
  * 3. 活跃测试变更的列表和管理
  * 4. 目录存在性检查和断言
- * 
+ *
  * 工作区目录结构：
  * testspec/
  *   ├── changes/
@@ -25,7 +25,7 @@
  *   │       └── <date>-<name>/  # 归档的测试变更
  *   │           ├── manifest.json
  *   │           └── ...
- * 
+ *
  * 使用场景：
  * - 创建新的测试变更工作区
  * - 解析已有的测试变更工作区
@@ -35,21 +35,22 @@
 
 import { access, mkdir, readdir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { WORKSPACE_CONFIG } from "../core/config.js";
 import { TestSpecError } from "../core/errors.js";
 import { normalizeChangeName } from "./names.js";
 
 /** 工作区根目录名称 */
-export const WORKSPACE_ROOT = "testspec";
+export const WORKSPACE_ROOT = WORKSPACE_CONFIG.root;
 
 /** 变更目录名称 */
-export const CHANGES_DIR = "changes";
+export const CHANGES_DIR = WORKSPACE_CONFIG.changesDir;
 
 /** 归档目录名称 */
-export const ARCHIVE_DIR = "archive";
+export const ARCHIVE_DIR = WORKSPACE_CONFIG.archiveDir;
 
 /**
  * 测试变更工作区接口
- * 
+ *
  * @interface ChangeWorkspace
  * @property {string} name - 测试变更名称（已规范化）
  * @property {string} rootDir - 变更根目录路径（testspec/changes/）
@@ -79,16 +80,16 @@ export function getArchiveRoot(cwd = process.cwd()): string {
 
 /**
  * 构建测试变更工作区对象
- * 
+ *
  * 该函数负责：
  * 1. 规范化测试变更名称
  * 2. 计算各种目录路径
  * 3. 返回工作区对象
- * 
+ *
  * @param {string} name - 测试变更名称（将被规范化）
  * @param {string} [cwd] - 工作目录，默认为 process.cwd()
  * @returns {ChangeWorkspace} 测试变更工作区对象
- * 
+ *
  * @example
  * ```typescript
  * const workspace = buildChangeWorkspace('My Feature');
@@ -112,8 +113,8 @@ export function buildChangeWorkspace(name: string, cwd = process.cwd()): ChangeW
     name: normalizedName,
     rootDir,
     changeDir,
-    specsDir: join(changeDir, "specs"),
-    artifactsDir: join(changeDir, "artifacts"),
+    specsDir: join(changeDir, WORKSPACE_CONFIG.specsDir),
+    artifactsDir: join(changeDir, WORKSPACE_CONFIG.artifactsDir),
   };
 }
 
@@ -144,26 +145,26 @@ export async function listActiveChanges(cwd = process.cwd()): Promise<string[]> 
 
 /**
  * 解析测试变更工作区
- * 
+ *
  * 该函数负责：
  * 1. 如果指定了名称，构建并验证工作区
  * 2. 如果未指定名称，自动检测唯一的工作区
  * 3. 如果有多个活跃工作区，要求用户指定名称
  * 4. 如果没有活跃工作区，抛出错误
- * 
+ *
  * @param {string} [name] - 测试变更名称（可选）
  * @param {string} [cwd] - 工作目录，默认为 process.cwd()
  * @returns {Promise<ChangeWorkspace>} 测试变更工作区对象
  * @throws {TestSpecError} 如果工作区不存在、有多个工作区或没有工作区
- * 
+ *
  * @example
  * ```typescript
  * // 指定名称
  * const workspace = await resolveChangeWorkspace('my-feature');
- * 
+ *
  * // 自动检测唯一的工作区
  * const workspace = await resolveChangeWorkspace();
- * 
+ *
  * // 如果有多个工作区，会抛出错误
  * // Error: Multiple active test changes found: feature-a, feature-b. Specify a change name.
  * ```
@@ -210,28 +211,28 @@ export async function resolveChangeWorkspace(
 
 /**
  * 创建测试变更工作区
- * 
+ *
  * 该函数负责：
  * 1. 构建工作区对象
  * 2. 检查工作区是否已存在（除非 force 为 true）
  * 3. 创建 specs/ 和 artifacts/ 子目录
  * 4. 返回工作区对象
- * 
+ *
  * @param {string} name - 测试变更名称（将被规范化）
  * @param {Object} [options] - 可选配置
  * @param {string} [options.cwd] - 工作目录，默认为 process.cwd()
  * @param {boolean} [options.force] - 是否强制覆盖已有工作区，默认为 false
  * @returns {Promise<ChangeWorkspace>} 测试变更工作区对象
  * @throws {TestSpecError} 如果工作区已存在且 force 为 false
- * 
+ *
  * @example
  * ```typescript
  * // 创建新工作区
  * const workspace = await createChangeWorkspace('my-feature');
- * 
+ *
  * // 强制覆盖已有工作区
  * const workspace = await createChangeWorkspace('my-feature', { force: true });
- * 
+ *
  * // 指定工作目录
  * const workspace = await createChangeWorkspace('my-feature', { cwd: '/path/to/project' });
  * ```
