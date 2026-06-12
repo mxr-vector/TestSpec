@@ -1,26 +1,27 @@
 /**
  * @fileoverview TestSpec 代理初始化模块
- * 
+ *
  * 该模块实现了 TestSpec 工作区的初始化功能，包括：
  * 1. 创建测试变更目录结构
- * 2. 生成 AI 代理集成文件（Claude Code、Qoder、Trae 等）
+ * 2. 生成 AI 代理集成文件（Claude Code、Codex、Qoder、Trae 等）
  * 3. 更新或创建 AGENTS.md 文件（用于 Codex 和通用代理）
  * 4. 提供交互式代理选择界面
  * 5. 管理生成文件的生命周期（创建、刷新、保留、删除）
- * 
+ *
  * 支持的 AI 代理集成：
  * - claude: Claude Code（默认启用）
  * - qoder: Qoder（默认启用）
  * - codex: Codex
  * - trae: Trae
  * - generic: 通用代理指导
- * 
+ *
  * 生成的文件结构：
  * .claude/commands/test/*.md - Claude Code 斜杠命令
+ * .codex/skills/testspec-<id>/SKILL.md - Codex Skill 文件
  * .qoder/commands/test/*.md - Qoder 命令文件
  * .trae/commands/test/*.md - Trae 命令文件
  * AGENTS.md - 代理工作流指导文档
- * 
+ *
  * 所有生成的文件都包含 GENERATED_FILE_MARKER，用于标识和后续清理。
  */
 
@@ -34,7 +35,7 @@ import { ARCHIVE_DIR, CHANGES_DIR, WORKSPACE_ROOT } from "../workflow/workspace.
 
 /**
  * 生成文件标识标记
- * 
+ *
  * 所有由 TestSpec 生成的文件都会包含此标记，用于：
  * 1. 标识文件是由 TestSpec 自动生成的
  * 2. 在重新初始化时识别可以安全覆盖的文件
@@ -55,7 +56,7 @@ export const AGENTS_SECTION_END = "<!-- END TESTSPEC AGENT WORKFLOW -->";
 
 /**
  * 工作流命令配置数组
- * 
+ *
  * 定义了所有 TestSpec 工作流命令的元数据，包括：
  * - id: 命令标识符
  * - label: 工作流标签（用于 AI 代理识别）
@@ -63,11 +64,12 @@ export const AGENTS_SECTION_END = "<!-- END TESTSPEC AGENT WORKFLOW -->";
  * - backingCommand: 底层 CLI 命令
  * - description: 命令描述
  * - argumentHint: 参数提示
- * 
+ *
  * 这些配置用于：
  * 1. 生成 Claude Code 斜杠命令文件
- * 2. 生成 Qoder 和 Trae 命令文件
- * 3. 更新 AGENTS.md 文档
+ * 2. 生成 Codex Skill 文件
+ * 3. 生成 Qoder 和 Trae 命令文件
+ * 4. 更新 AGENTS.md 文档
  */
 export const WORKFLOW_COMMANDS = [
   {
@@ -166,7 +168,7 @@ export const AGENT_INTEGRATIONS: AgentIntegration[] = [
   {
     id: "codex",
     displayName: "Codex",
-    description: "Update AGENTS.md with Codex-friendly TestSpec workflow guidance.",
+    description: "Generate .codex skills and update AGENTS.md with TestSpec workflow guidance.",
     defaultSelected: false,
   },
   {
@@ -313,6 +315,10 @@ export async function initializeTestSpec(options: InitOptions = {}): Promise<Ini
 
   if (selectedAgents.includes("trae")) {
     await writeCommandFiles(cwd, ".trae", options.force === true, removedCommandFileSet, result);
+  }
+
+  if (selectedAgents.includes("codex")) {
+    await writeCodexSkillFiles(cwd, options.force === true, removedCommandFileSet, result);
   }
 
   if (selectedAgents.includes("codex") || selectedAgents.includes("generic")) {
@@ -464,6 +470,43 @@ async function cleanupGeneratedCommandFiles(
     }
   }
 
+  if (selectedAgents.includes("codex")) {
+    const skillsDir = join(cwd, ".codex", "skills");
+    let entries: Dirent<string>[];
+    try {
+      entries = await readdir(skillsDir, { encoding: "utf8", withFileTypes: true });
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        entries = [];
+      } else {
+        throw error;
+      }
+    }
+
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !entry.name.startsWith("testspec-")) {
+        continue;
+      }
+
+      const skillDir = join(skillsDir, entry.name);
+      const skillPath = join(skillDir, "SKILL.md");
+      try {
+        const existing = await readFile(skillPath, "utf8");
+        if (!existing.includes(GENERATED_FILE_MARKER)) {
+          continue;
+        }
+
+        await rm(skillDir, { recursive: true, force: true });
+        removed.push(skillPath);
+      } catch (error: unknown) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+
   return removed;
 }
 
@@ -493,6 +536,24 @@ async function writeCommandFiles(
   for (const command of WORKFLOW_COMMANDS) {
     const outputPath = join(cwd, rootDir, "commands", "test", `${command.id}.md`);
     const writeResult = await writeGeneratedFile(outputPath, renderCommandFile(command), force);
+    collectWriteResult(
+      result,
+      writeResult.status === "created" && removedCommandFileSet.has(outputPath)
+        ? { status: "refreshed", path: writeResult.path }
+        : writeResult
+    );
+  }
+}
+
+async function writeCodexSkillFiles(
+  cwd: string,
+  force: boolean,
+  removedCommandFileSet: ReadonlySet<string>,
+  result: InitResult
+): Promise<void> {
+  for (const command of WORKFLOW_COMMANDS) {
+    const outputPath = join(cwd, ".codex", "skills", codexSkillName(command), "SKILL.md");
+    const writeResult = await writeGeneratedFile(outputPath, renderCodexSkillFile(command), force);
     collectWriteResult(
       result,
       writeResult.status === "created" && removedCommandFileSet.has(outputPath)
@@ -574,6 +635,40 @@ function renderCommandFile(command: WorkflowCommand): string {
     `Treat \`${command.slashCommand}\` as the Agent workflow label \`${command.label}\` for TestSpec.`,
     "",
     "User arguments: $ARGUMENTS",
+    "",
+    ...agentWorkflowInstructions(command),
+    "",
+    "Provider-neutral generation rules:",
+    "",
+    ...PROVIDER_NEUTRAL_PROMPT_RULES.map((rule) => `- ${rule}`),
+    "",
+  ].join("\n");
+}
+
+function renderCodexSkillFile(command: WorkflowCommand): string {
+  const skillName = codexSkillName(command);
+  return [
+    "---",
+    `name: ${skillName}`,
+    `description: ${command.description}`,
+    "license: MIT",
+    "compatibility: Requires TestSpec CLI.",
+    "metadata:",
+    "  author: testspec",
+    '  version: "1.0"',
+    "---",
+    "",
+    GENERATED_FILE_MARKER,
+    "",
+    `# ${skillName}`,
+    "",
+    `Brief: ${command.description}`,
+    "",
+    `Treat this skill as the TestSpec workflow label \`${command.label}\`.`,
+    `Equivalent slash command label: \`${command.slashCommand}\`.`,
+    `Backing CLI command: \`${command.backingCommand}\`.`,
+    "",
+    "User arguments: the text provided when invoking this skill.",
     "",
     ...agentWorkflowInstructions(command),
     "",
@@ -740,6 +835,10 @@ function formatAgentNames(agentIds: readonly AgentId[]): string {
 
 function titleCase(value: string): string {
   return value.slice(0, 1).toUpperCase() + value.slice(1);
+}
+
+function codexSkillName(command: WorkflowCommand): string {
+  return `testspec-${command.id}`;
 }
 
 async function pathExists(path: string): Promise<boolean> {

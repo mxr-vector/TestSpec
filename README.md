@@ -36,14 +36,14 @@ npx @wangjh2001/testspec new <test-name> --requirement <path>
 testspec init
 ```
 
-This sets up the TestSpec workspace and configures AI agent integrations. By default, the interactive selection starts with Claude Code and Qoder selected. Use Space to select/deselect integrations and Enter to confirm. Before regenerating selected agent command files, init removes stale TestSpec-generated command files in the selected `.claude/commands/test/`, `.qoder/commands/test/`, or `.trae/commands/test/` directories that still contain the generated marker; custom command files without the marker are preserved. Command files with the generated marker are treated as TestSpec-managed and may be deleted/recreated by `testspec init`.
+This sets up the TestSpec workspace and configures AI agent integrations. By default, the interactive selection starts with Claude Code and Qoder selected. Use Space to select/deselect integrations and Enter to confirm. Before regenerating selected agent command files, init removes stale TestSpec-generated command files in the selected `.claude/commands/test/`, `.qoder/commands/test/`, or `.trae/commands/test/` directories that still contain the generated marker; custom command files without the marker are preserved. Codex skills under `.codex/skills/testspec-*/SKILL.md` are refreshed only when they contain the generated marker or `--force` is used. Generated command and skill files are treated as TestSpec-managed and may be recreated by `testspec init`.
 
 Available integrations:
 
 | Agent       | Output                                                       |
 | ----------- | ------------------------------------------------------------ |
 | Claude Code | `.claude/commands/test/*.md` for `/test:*` slash commands    |
-| Codex       | `AGENTS.md` guidance mapping `test:*` labels to CLI commands |
+| Codex       | `.codex/skills/testspec-*/SKILL.md` skills plus `AGENTS.md` guidance |
 | Qoder       | `.qoder/commands/test/*.md` for the same workflow labels     |
 | Trae        | `.trae/commands/test/*.md` for the same workflow labels      |
 | Generic     | Tool-agnostic `AGENTS.md` workflow guidance                  |
@@ -66,7 +66,7 @@ This creates a new test change directory with a proposal template. `--requiremen
 
 ### 3. Run the Workflow
 
-For requirement-grounded generation, run the `test:*` labels inside Claude Code, Codex, Qoder, Trae, or another configured coding agent. The agent reads the requirement document and writes semantic artifacts; the CLI remains provider-free and handles validation, export, reporting, and archive.
+For requirement-grounded generation, run the configured workflow entry points inside Claude Code, Codex, Qoder, Trae, or another coding agent. Claude Code, Qoder, and Trae expose `/test:*` command labels; Codex exposes `testspec-*` skills that map back to the same `test:*` workflow labels. The agent reads the requirement document and writes semantic artifacts; the CLI remains provider-free and handles validation, export, reporting, and archive.
 
 ```text
 /test:analysis login-v2
@@ -147,6 +147,7 @@ After initialization and creating test changes, your project will have:
 ```
 your-project/
 ├── .claude/commands/test/    # Claude Code slash commands (if selected)
+├── .codex/skills/testspec-*/ # Codex skills (if selected)
 ├── .qoder/commands/test/     # Qoder commands (if selected)
 ├── .trae/commands/test/      # Trae commands (if selected)
 ├── AGENTS.md                 # Codex or generic agent guidance (if selected)
@@ -190,7 +191,10 @@ After `testspec init`, AI agents can use workflow labels directly:
 **Qoder / Trae:**
 Use the same `/test:*` workflow labels from `.qoder/commands/test/*.md` or `.trae/commands/test/*.md`. These command files include the brief instruction, user arguments, and provider-neutral prompt-pack rules in the command body.
 
-**Codex / Generic Agents:**
+**Codex:**
+Use the generated skills in `.codex/skills/testspec-*/SKILL.md`, for example `testspec-analysis`, `testspec-points`, and `testspec-excel`. Each skill maps to the corresponding `test:*` workflow label and includes the backing CLI command plus provider-neutral prompt-pack rules. `AGENTS.md` remains a global overview.
+
+**Generic Agents:**
 Read `AGENTS.md` for the same provider-neutral prompt-pack rules. Semantic labels such as `test:analysis`, `test:points`, and `test:excel` should read requirement evidence and generate artifacts before running deterministic CLI validation/export commands.
 
 The `test:*` labels are Agent workflow labels, not shell commands.

@@ -198,6 +198,24 @@ describe("initializeTestSpec", () => {
     expect(content).not.toContain("compact test cases do not need to duplicate");
   });
 
+  it("generates all Codex workflow skills", async () => {
+    await initializeTestSpec({ agents: "codex" });
+
+    for (const command of WORKFLOW_COMMANDS) {
+      const content = await readFile(
+        join(tempDir, ".codex", "skills", `testspec-${command.id}`, "SKILL.md"),
+        "utf8"
+      );
+
+      expect(content).toContain(`name: testspec-${command.id}`);
+      expect(content).toContain(command.label);
+      expect(content).toContain(command.slashCommand);
+      expect(content).toContain(command.backingCommand);
+      expect(content).toContain(GENERATED_FILE_MARKER);
+      expect(content).toContain("Provider-neutral generation rules");
+    }
+  });
+
   it("creates AGENTS.md for generic agent guidance", async () => {
     await initializeTestSpec({ agents: "generic" });
 
@@ -237,6 +255,9 @@ describe("initializeTestSpec", () => {
     await expect(
       readFile(join(tempDir, ".trae", "commands", "test", "new.md"), "utf8")
     ).resolves.toContain("/test:new");
+    await expect(
+      readFile(join(tempDir, ".codex", "skills", "testspec-new", "SKILL.md"), "utf8")
+    ).resolves.toContain("test:new");
     await expect(readFile(join(tempDir, "AGENTS.md"), "utf8")).resolves.toContain("Codex");
     await expect(readFile(join(tempDir, "AGENTS.md"), "utf8")).resolves.toContain(
       "Generic Agent guidance"
@@ -275,9 +296,9 @@ describe("initializeTestSpec", () => {
     await initializeTestSpec({ agents: "claude,codex" });
     const second = await initializeTestSpec({ agents: "claude,codex" });
 
-    expect(second.removed.length).toBe(WORKFLOW_COMMANDS.length);
+    expect(second.removed.length).toBe(WORKFLOW_COMMANDS.length * 2);
     expect(second.created.length).toBe(0);
-    expect(second.refreshed.length).toBe(WORKFLOW_COMMANDS.length);
+    expect(second.refreshed.length).toBe(WORKFLOW_COMMANDS.length * 2);
     expect(second.preserved.some((path) => path.endsWith("AGENTS.md"))).toBe(true);
     await expect(
       readFile(join(tempDir, ".claude", "commands", "test", "new.md"), "utf8")
@@ -299,6 +320,30 @@ describe("initializeTestSpec", () => {
     await expect(readFile(join(commandDir, "new.md"), "utf8")).resolves.toContain("/test:new");
   });
 
+  it("removes stale generated Codex skills before regenerating selected skills", async () => {
+    const staleSkillDir = join(tempDir, ".codex", "skills", "testspec-old");
+    const staleSkillPath = join(staleSkillDir, "SKILL.md");
+    const customSkillDir = join(tempDir, ".codex", "skills", "testspec-custom");
+    const customSkillPath = join(customSkillDir, "SKILL.md");
+    await mkdir(staleSkillDir, { recursive: true });
+    await mkdir(customSkillDir, { recursive: true });
+    await writeFile(staleSkillPath, `${GENERATED_FILE_MARKER}\n\n# testspec-old\n`);
+    await writeFile(customSkillPath, "custom skill\n");
+
+    const result = await initializeTestSpec({ agents: "codex" });
+
+    expect(
+      result.removed.some((path) =>
+        path.endsWith(join(".codex", "skills", "testspec-old", "SKILL.md"))
+      )
+    ).toBe(true);
+    await expect(readFile(staleSkillPath, "utf8")).rejects.toThrow();
+    await expect(readFile(customSkillPath, "utf8")).resolves.toBe("custom skill\n");
+    await expect(
+      readFile(join(tempDir, ".codex", "skills", "testspec-new", "SKILL.md"), "utf8")
+    ).resolves.toContain("name: testspec-new");
+  });
+
   it("preserves custom command files unless force is provided", async () => {
     const customPath = join(tempDir, ".claude", "commands", "test", "new.md");
     await mkdir(join(tempDir, ".claude", "commands", "test"), { recursive: true });
@@ -315,6 +360,32 @@ describe("initializeTestSpec", () => {
     await expect(readFile(customPath, "utf8")).resolves.toContain(
       "testspec new <name> --requirement <path>"
     );
+  });
+
+  it("refreshes generated Codex skills during Codex-only init", async () => {
+    await initializeTestSpec({ agents: "codex" });
+    const second = await initializeTestSpec({ agents: "codex" });
+
+    expect(second.removed.length).toBe(WORKFLOW_COMMANDS.length);
+    expect(second.created.length).toBe(0);
+    expect(second.refreshed.length).toBe(WORKFLOW_COMMANDS.length);
+    expect(second.preserved.some((path) => path.endsWith("AGENTS.md"))).toBe(true);
+  });
+
+  it("preserves custom Codex skills unless force is provided", async () => {
+    const customPath = join(tempDir, ".codex", "skills", "testspec-analysis", "SKILL.md");
+    await mkdir(join(tempDir, ".codex", "skills", "testspec-analysis"), { recursive: true });
+    await writeFile(customPath, "custom skill\n");
+
+    const first = await initializeTestSpec({ agents: "codex" });
+    expect(
+      first.preserved.some((path) => path.endsWith(".codex/skills/testspec-analysis/SKILL.md"))
+    ).toBe(true);
+    await expect(readFile(customPath, "utf8")).resolves.toBe("custom skill\n");
+
+    await initializeTestSpec({ agents: "codex", force: true });
+    await expect(readFile(customPath, "utf8")).resolves.toContain("name: testspec-analysis");
+    await expect(readFile(customPath, "utf8")).resolves.toContain("testspec analysis [name]");
   });
 
   it("does not remove generated command files for integrations omitted from the current selection", async () => {
