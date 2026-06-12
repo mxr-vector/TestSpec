@@ -1,25 +1,23 @@
 /**
- * @fileoverview TestSpec 性能测试用例生成模块
+ * @fileoverview TestSpec 性能测试用例模块
  *
- * 该模块实现了性能测试用例的自动生成功能，包括：
- * 1. 从测试点中推断性能测试场景
- * 2. 根据场景类型生成对应的性能测试配置
- * 3. 支持多种性能测试类型：负载测试、压力测试、容量测试、稳定性测试
- * 4. 自动生成性能测试用例 JSON 文件
+ * 该模块实现了性能测试用例的管理功能，包括：
+ * 1. 读取 Agent 通过 Skill 语义生成的业务并发性能测试用例
+ * 2. 内置 9 项固定全局非功能性性能测试模板（基线、泄漏、资源、安全等）
+ * 3. 合并业务并发用例与全局非功能性用例
+ * 4. 支持智能缓存策略，避免不必要的重复读取
  *
- * 性能测试类型：
- * - 负载测试（query/core）：验证查询和核心链路在目标并发下的响应时间、吞吐量和错误率
- * - 压力测试（transaction）：验证事务操作在逐步加压下的吞吐上限和事务成功率
- * - 容量测试（batch）：验证批量操作在指定数据规模下的处理耗时和资源消耗
- * - 稳定性测试（dependency）：验证依赖服务波动时的响应时间、失败率和降级行为
+ * 性能测试用例来源：
+ * - 业务并发用例：由 Agent 通过 `.agent/skills/testspec-performance/SKILL.md`
+ *   引导语义生成，写入 `performance-cases.json`
+ * - 全局非功能性用例：代码内置固定模板，CLI 在导出 Excel 时自动追加
  *
- * 推断规则：
- * - 基于测试点标题和章节关键词进行分类
- * - 核心流程测试点优先级最高
- * - 最多生成 5 个性能测试用例
+ * performanceType 值域：
+ * - 业务并发类型（Agent 生成）：负载测试、压力测试、并发测试、容量测试、稳定性测试
+ * - 全局非功能性类型（CLI 内置）：基线测试、慢查询检测、泄漏检测、启动耗时、资源监控、安全性能
  */
 
-import { readFile, stat, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { PERFORMANCE_CONFIG, WORKFLOW_FILES } from "../core/config.js";
 import type { ChangeWorkspace } from "./workspace.js";
@@ -30,7 +28,7 @@ import type { ChangeWorkspace } from "./workspace.js";
  * @interface PerformanceCase
  * @property {string} module - 业务模块名称
  * @property {string} scenarioName - 性能测试场景名称
- * @property {string} performanceType - 性能测试类型（负载测试、压力测试、容量测试、稳定性测试）
+ * @property {string} performanceType - 性能测试类型
  * @property {string} objective - 测试目标描述
  * @property {string} preconditions - 前置条件
  * @property {string} concurrentUsers - 并发用户数
@@ -78,342 +76,277 @@ export interface PerformanceCase {
   notes?: string;
 }
 
-interface PerformanceCandidate {
-  testPointId: string;
-  title: string;
-  section: string;
-  requirementIds: string[];
-  category: PerformanceCategory;
-  rank: number;
-}
-
-interface TestPoint {
-  id: string;
-  title: string;
-  section: string;
-}
-
-type PerformanceCategory = "query" | "transaction" | "batch" | "dependency" | "core";
-
-const CATEGORY_KEYWORDS: Record<Exclude<PerformanceCategory, "core">, string[]> = {
-  query: ["查询", "搜索", "筛选", "列表", "分页", "检索", "报表", "统计"],
-  transaction: ["提交", "创建", "新增", "保存", "更新", "删除", "下单", "支付", "注册", "登录"],
-  batch: ["批量", "导入", "导出", "上传", "下载", "同步", "迁移", "生成"],
-  dependency: ["第三方", "接口", "依赖", "回调", "通知", "消息", "队列", "网关", "支付渠道"],
-};
-
 /**
- * 生成性能测试用例
+ * 生成性能测试用例（仅全局非功能性模板）
  *
- * 该函数负责：
- * 1. 读取性能测试上下文（测试点、需求分析、测试提案）
- * 2. 从测试点中推断性能测试候选场景
- * 3. 根据优先级选择最多 5 个场景
- * 4. 为每个场景生成性能测试用例配置
- * 5. 将结果写入 performance-cases.json 文件
+ * 纯函数，仅返回 9 项固定全局非功能性性能测试用例，不写入文件。
+ * 业务并发用例由 Agent 通过 Skill 语义生成，写入 performance-cases.json。
  *
- * 推断逻辑：
- * - 核心流程测试点优先级最高
- * - 查询类场景（查询、搜索、筛选等）优先级次之
- * - 事务类场景（提交、创建、保存等）再次之
- * - 批量类场景（批量、导入、导出等）再次之
- * - 依赖类场景（第三方、接口、回调等）优先级最低
- *
- * @param {ChangeWorkspace} workspace - 测试变更工作区对象
- * @returns {Promise<PerformanceCase[]>} 生成的性能测试用例数组
- *
- * @example
- * ```typescript
- * const performanceCases = await generatePerformanceCases(workspace);
- * console.log(`已生成 ${performanceCases.length} 个性能测试用例`);
- * ```
+ * @returns {PerformanceCase[]} 生成的性能测试用例数组（仅全局非功能性）
  */
-export async function generatePerformanceCases(
-  workspace: ChangeWorkspace
-): Promise<PerformanceCase[]> {
-  // 读取性能测试上下文
-  const context = await readPerformanceContext(workspace);
-
-  // 推断性能测试候选场景
-  const candidates = inferPerformanceCandidates(context.testpoints, context.combinedText);
-
-  // 选择优先级最高的场景（最多 5 个）
-  const cases = candidates.slice(0, PERFORMANCE_CONFIG.maxCases).map(createPerformanceCase);
-
-  // 写入 JSON 文件
-  const outputPath = join(workspace.artifactsDir, WORKFLOW_FILES.performanceCases);
-  await writeFile(outputPath, `${JSON.stringify(cases, null, 2)}\n`);
-
-  return cases;
+export function generatePerformanceCases(): PerformanceCase[] {
+  return createGlobalNonFunctionalCases();
 }
 
 /**
  * 读取或生成性能测试用例
  *
- * 该函数实现了智能的缓存策略：
- * 1. 首先尝试读取已有的 performance-cases.json 文件
- * 2. 如果文件存在且非空，检查是否需要重新生成：
- *    - 比较源文件（proposal.md、requirements-analysis.md、testpoints.md）的修改时间
- *    - 如果源文件比性能测试用例文件更新，则重新生成
- *    - 否则返回缓存的用例
- * 3. 如果文件不存在、为空或格式错误，则重新生成
- *
- * 这种策略确保：
- * - 性能测试用例始终与最新的测试点保持同步
- * - 避免不必要的重复生成
- * - 支持增量更新
+ * 合并策略：
+ * 1. 从 performance-cases.json 读取 Agent 生成的业务并发用例（过滤旧版全局用例）
+ * 2. 始终追加 9 项全局非功能性用例
+ * 3. 合并后返回
  *
  * @param {ChangeWorkspace} workspace - 测试变更工作区对象
- * @returns {Promise<PerformanceCase[]>} 性能测试用例数组
- *
- * @example
- * ```typescript
- * const performanceCases = await readOrGeneratePerformanceCases(workspace);
- * console.log(`已获取 ${performanceCases.length} 个性能测试用例`);
- * ```
+ * @returns {Promise<PerformanceCase[]>} 合并后的性能测试用例数组（业务并发 + 全局非功能性）
  */
 export async function readOrGeneratePerformanceCases(
   workspace: ChangeWorkspace
 ): Promise<PerformanceCase[]> {
+  const globalCases = createGlobalNonFunctionalCases();
+  const businessCases = await readBusinessPerformanceCases(workspace);
+  return [...businessCases, ...globalCases];
+}
+
+/**
+ * 读取 Agent 生成的业务并发性能测试用例
+ *
+ * @param {ChangeWorkspace} workspace - 测试变更工作区对象
+ * @returns {Promise<PerformanceCase[]>} Agent 生成的业务并发用例数组（可能为空）
+ */
+async function readBusinessPerformanceCases(
+  workspace: ChangeWorkspace
+): Promise<PerformanceCase[]> {
   const outputPath = join(workspace.artifactsDir, WORKFLOW_FILES.performanceCases);
-  const sourcePaths = [
-    join(workspace.changeDir, WORKFLOW_FILES.proposal),
-    join(workspace.changeDir, WORKFLOW_FILES.requirementsAnalysis),
-    join(workspace.specsDir, WORKFLOW_FILES.testpoints),
-  ];
 
   try {
-    // 尝试读取已有的性能测试用例文件
     const content = await readFile(outputPath, "utf8");
     const parsed = JSON.parse(content) as PerformanceCase[];
 
     if (Array.isArray(parsed) && parsed.length > 0) {
-      // 获取性能测试用例文件的修改时间
-      const outputStat = await stat(outputPath);
-
-      // 获取所有源文件的修改时间
-      const sourceStats = await Promise.all(sourcePaths.map(readOptionalStat));
-      const latestSourceMtime = Math.max(
-        ...sourceStats.map((sourceStat) => sourceStat?.mtimeMs ?? 0)
+      // 过滤掉可能混入的全局非功能性用例（如果 JSON 是旧版生成的）
+      return parsed.filter(
+        (c) => c.module !== PERFORMANCE_CONFIG.globalModule
       );
-
-      // 如果源文件比性能测试用例文件更新，则需要重新生成
-      if (latestSourceMtime <= outputStat.mtimeMs) {
-        return parsed;
-      }
     }
-  } catch {
-    // 文件不存在、为空或格式错误，需要重新生成
+  } catch (error) {
+    // 文件不存在或格式错误，记录调试信息后返回空数组
+    const reason = error instanceof Error ? error.message : String(error);
+    console.debug(`[testspec] No business performance cases found: ${reason}`);
   }
 
-  // 重新生成性能测试用例
-  return generatePerformanceCases(workspace);
+  return [];
 }
 
-async function readPerformanceContext(workspace: ChangeWorkspace): Promise<{
-  testpoints: TestPoint[];
-  combinedText: string;
-}> {
-  const proposal = await readOptional(join(workspace.changeDir, WORKFLOW_FILES.proposal));
-  const analysis = await readOptional(
-    join(workspace.changeDir, WORKFLOW_FILES.requirementsAnalysis)
-  );
-  const testpointsContent = await readOptional(join(workspace.specsDir, WORKFLOW_FILES.testpoints));
-  const testpoints = parseTestPoints(testpointsContent);
-
-  return {
-    testpoints,
-    combinedText: [proposal, analysis, testpointsContent].join("\n"),
-  };
-}
-
-function inferPerformanceCandidates(
-  testpoints: TestPoint[],
-  _combinedText: string
-): PerformanceCandidate[] {
-  const candidates = testpoints.map((testpoint) => {
-    const text = `${testpoint.section} ${testpoint.title}`;
-    const category = inferCategory(text, testpoint.section, testpoint.title);
-    return {
-      testPointId: testpoint.id,
-      title: testpoint.title,
-      section: testpoint.section,
-      requirementIds: extractRequirementIds(testpoint.title),
-      category,
-      rank: categoryRank(category, testpoint.section, testpoint.title),
-    };
-  });
-
-  const rankedCandidates = candidates.sort((left, right) => {
-    if (left.rank !== right.rank) {
-      return left.rank - right.rank;
-    }
-    return (
-      Number.parseInt(left.testPointId.replace(/\D/g, "") || "0", 10) -
-      Number.parseInt(right.testPointId.replace(/\D/g, "") || "0", 10)
-    );
-  });
-
-  if (rankedCandidates.length > 0) {
-    return rankedCandidates;
-  }
+/**
+ * 创建固定全局非功能性性能测试用例
+ *
+ * 返回 9 项固定的全局非功能性性能测试用例模板，包括：
+ * 1. 接口响应时间基线（基线测试）
+ * 2. 数据库慢查询检测（慢查询检测）
+ * 3. 内存泄漏持续监测（泄漏检测）
+ * 4. 连接池/句柄释放（泄漏检测）
+ * 5. 服务冷启动耗时（启动耗时）
+ * 6. CPU/内存资源水位（资源监控）
+ * 7. DDoS 防护验证（安全性能）
+ * 8. 接口限流策略验证（安全性能）
+ * 9. 大报文传输耐受（安全性能）
+ *
+ * @returns {PerformanceCase[]} 9 项固定全局非功能性性能测试用例
+ */
+export function createGlobalNonFunctionalCases(): PerformanceCase[] {
+  const module = PERFORMANCE_CONFIG.globalModule;
+  const unknown = PERFORMANCE_CONFIG.unknownTarget;
+  const pending = PERFORMANCE_CONFIG.pendingMetric;
 
   return [
     {
-      testPointId: "TP-001",
-      title: "覆盖核心业务流程的主要成功路径。",
-      section: "核心流程",
-      requirementIds: ["REQ-001"],
-      category: "core",
-      rank: 1,
+      module,
+      scenarioName: "接口响应时间基线",
+      performanceType: "基线测试",
+      objective: "空载或低负载下核心接口 P95 响应时间 ≤ 目标值。",
+      preconditions: "测试环境已部署，数据库已初始化基础数据集，无其他负载干扰。",
+      concurrentUsers: "1-5",
+      duration: "5min",
+      steps: [
+        "梳理核心接口清单（登录、列表查询、详情查看、提交等）。",
+        "使用压测工具以 1-5 并发逐一请求每个接口。",
+        "记录每个接口的 P50、P95、P99 响应时间和错误率。",
+        "对比各接口响应时间与预设基线阈值。",
+        "标记超出阈值的接口并输出基线报告。",
+      ],
+      targetThroughput: unknown,
+      actualThroughput: pending,
+      avgResponseTime: pending,
+      p95ResponseTime: pending,
+      errorRate: pending,
+    },
+    {
+      module,
+      scenarioName: "数据库慢查询检测",
+      performanceType: "慢查询检测",
+      objective: "核心查询无全表扫描，执行耗时 ≤ 阈值。",
+      preconditions: "数据库已加载生产级别数据量，慢查询日志或 APM 监控已开启。",
+      concurrentUsers: "1",
+      duration: "10min",
+      steps: [
+        "开启数据库慢查询日志，设置阈值（如 200ms）。",
+        "依次执行核心业务场景覆盖的数据库查询。",
+        "收集慢查询日志，提取耗时 ≥ 阈值的 SQL。",
+        "对慢查询 SQL 执行 EXPLAIN 分析执行计划。",
+        "确认无全表扫描、无缺失索引，记录优化建议。",
+      ],
+      targetThroughput: "N/A",
+      actualThroughput: pending,
+      avgResponseTime: pending,
+      p95ResponseTime: pending,
+      errorRate: pending,
+    },
+    {
+      module,
+      scenarioName: "内存泄漏持续监测",
+      performanceType: "泄漏检测",
+      objective: "持续运行 N 小时后堆内存无持续增长趋势。",
+      preconditions: "测试环境已部署，APM 或进程级内存监控已开启。",
+      concurrentUsers: "10-50",
+      duration: "2h",
+      steps: [
+        "记录服务启动后的初始堆内存使用量。",
+        "以中等并发（10-50 用户）持续执行混合业务场景。",
+        "每 10 分钟采样一次堆内存、GC 次数和 GC 耗时。",
+        "绘制内存使用时间曲线，分析是否存在持续上升趋势。",
+        "若内存持续增长超过初始值 30%，标记为泄漏疑似并记录堆转储。",
+      ],
+      targetThroughput: unknown,
+      actualThroughput: pending,
+      avgResponseTime: pending,
+      p95ResponseTime: pending,
+      errorRate: pending,
+    },
+    {
+      module,
+      scenarioName: "连接池/句柄释放",
+      performanceType: "泄漏检测",
+      objective: "高并发后数据库连接数和文件句柄恢复到基线水位。",
+      preconditions: "测试环境已部署，数据库连接池监控和 OS 文件句柄监控已开启。",
+      concurrentUsers: "100-200",
+      duration: "15min",
+      steps: [
+        "记录空闲状态下的数据库活跃连接数和进程文件句柄数。",
+        "以 100-200 并发执行高频数据库操作场景（查询+写入）。",
+        "持续 10 分钟后停止所有压力。",
+        "等待 5 分钟冷却期，再次记录连接数和句柄数。",
+        "对比冷却后数据与基线，确认连接和句柄已回收到基线水位 ±10%。",
+      ],
+      targetThroughput: unknown,
+      actualThroughput: pending,
+      avgResponseTime: pending,
+      p95ResponseTime: pending,
+      errorRate: pending,
+    },
+    {
+      module,
+      scenarioName: "服务冷启动耗时",
+      performanceType: "启动耗时",
+      objective: "服务从冷启动到首次可用响应 ≤ 目标值。",
+      preconditions: "服务已停止，依赖服务（数据库、缓存、消息队列）已就绪。",
+      concurrentUsers: "1",
+      duration: "5min",
+      steps: [
+        "完全停止目标服务进程。",
+        "记录启动命令执行的时间戳。",
+        "循环发送健康检查请求（如 /health 或 /ping），间隔 500ms。",
+        "记录首次收到 HTTP 200 响应的时间戳。",
+        "计算冷启动耗时（首次可用时间 - 启动命令时间），对比目标值。",
+      ],
+      targetThroughput: "N/A",
+      actualThroughput: pending,
+      avgResponseTime: pending,
+      p95ResponseTime: pending,
+      errorRate: pending,
+    },
+    {
+      module,
+      scenarioName: "CPU/内存资源水位",
+      performanceType: "资源监控",
+      objective: "峰值负载下 CPU 使用率 ≤ 80%，内存使用率 ≤ 75%。",
+      preconditions: "测试环境已部署，系统级 CPU/内存监控已开启（如 Prometheus + Grafana）。",
+      concurrentUsers: unknown,
+      duration: "15min",
+      steps: [
+        "记录空闲状态下的 CPU 和内存使用率基线。",
+        "以目标峰值并发执行混合业务场景。",
+        "每 30 秒采样一次 CPU 使用率、内存使用率、系统负载。",
+        "持续 15 分钟后停止压力，记录峰值 CPU 和峰值内存。",
+        "验证峰值 CPU ≤ 80%、峰值内存 ≤ 75%，超出则标记告警。",
+      ],
+      targetThroughput: unknown,
+      actualThroughput: pending,
+      avgResponseTime: pending,
+      p95ResponseTime: pending,
+      errorRate: pending,
+    },
+    {
+      module,
+      scenarioName: "DDoS 防护验证",
+      performanceType: "安全性能",
+      objective: "突发大量恶意请求下限流/熔断机制正确触发，正常流量不受影响。",
+      preconditions: "测试环境已部署限流/熔断组件（如网关限流、WAF），监控已开启。",
+      concurrentUsers: "500-1000",
+      duration: "10min",
+      steps: [
+        "以正常并发（如 50 用户）发送合法请求，记录基线响应时间和成功率。",
+        "同时从另一来源以 500-1000 并发发送大量恶意请求（高频重复、无效参数）。",
+        "验证限流/熔断机制在阈值触发后拒绝恶意流量（返回 429 或 503）。",
+        "验证正常流量的响应时间和成功率未显著恶化（偏差 ≤ 20%）。",
+        "停止恶意流量后验证服务在 1 分钟内恢复到基线水平。",
+      ],
+      targetThroughput: unknown,
+      actualThroughput: pending,
+      avgResponseTime: pending,
+      p95ResponseTime: pending,
+      errorRate: pending,
+    },
+    {
+      module,
+      scenarioName: "接口限流策略验证",
+      performanceType: "安全性能",
+      objective: "超过限流阈值时返回 429 状态码，正常流量不受影响。",
+      preconditions: "测试环境已配置接口级限流策略（如令牌桶或滑动窗口），限流阈值已知。",
+      concurrentUsers: unknown,
+      duration: "10min",
+      steps: [
+        "确认目标接口的限流阈值（如 100 QPS/用户）。",
+        "以低于阈值的速率发送请求，验证全部返回 200。",
+        "逐步提升请求速率至阈值的 150%-200%。",
+        "验证超出阈值的请求返回 HTTP 429，响应体包含 Retry-After 或限流提示。",
+        "验证未超限的请求仍正常返回 200，不受限流影响。",
+      ],
+      targetThroughput: unknown,
+      actualThroughput: pending,
+      avgResponseTime: pending,
+      p95ResponseTime: pending,
+      errorRate: pending,
+    },
+    {
+      module,
+      scenarioName: "大报文传输耐受",
+      performanceType: "安全性能",
+      objective: "超大请求体或响应体不导致 OOM 或请求超时。",
+      preconditions: "测试环境已部署，已确认接口对请求体大小的限制配置。",
+      concurrentUsers: "1-5",
+      duration: "10min",
+      steps: [
+        "构造接近服务端请求体上限的合法请求（如 10MB JSON/文件上传）。",
+        "发送请求并验证服务端正常处理或返回 413（Payload Too Large）。",
+        "构造超出上限的请求，验证服务端拒绝且不崩溃。",
+        "监控服务端进程内存，确认无 OOM 或内存突增。",
+        "对返回大响应体的接口（如导出），验证客户端可正常接收且不超时。",
+      ],
+      targetThroughput: "N/A",
+      actualThroughput: pending,
+      avgResponseTime: pending,
+      p95ResponseTime: pending,
+      errorRate: pending,
     },
   ];
-}
-
-function parseTestPoints(content: string): TestPoint[] {
-  const points: TestPoint[] = [];
-  let currentSection = "未分类";
-
-  for (const line of content.split(/\r?\n/)) {
-    const heading = /^##\s+(.+)$/.exec(line);
-    if (heading?.[1]) {
-      currentSection = heading[1].trim();
-      continue;
-    }
-
-    const point = /^-\s+\[(TP-\d+)]\s+(.+)$/.exec(line.trim());
-    if (point?.[1] && point[2]) {
-      points.push({ id: point[1], title: point[2].trim(), section: currentSection });
-    }
-  }
-
-  return points;
-}
-
-function inferCategory(text: string, section: string, title: string): PerformanceCategory {
-  if (containsAny(text, CATEGORY_KEYWORDS.dependency)) {
-    return "dependency";
-  }
-  if (containsAny(text, CATEGORY_KEYWORDS.batch)) {
-    return "batch";
-  }
-  if (containsAny(text, CATEGORY_KEYWORDS.query)) {
-    return "query";
-  }
-  if (containsAny(text, CATEGORY_KEYWORDS.transaction)) {
-    return "transaction";
-  }
-  if (section.includes("核心") || title.includes("主要成功路径")) {
-    return "core";
-  }
-  return "core";
-}
-
-function categoryRank(category: PerformanceCategory, section: string, title: string): number {
-  if (section.includes("核心") || title.includes("主要成功路径")) {
-    return 1;
-  }
-  const ranks: Record<PerformanceCategory, number> = {
-    query: 2,
-    transaction: 3,
-    batch: 4,
-    dependency: 5,
-    core: 6,
-  };
-  return ranks[category];
-}
-
-function createPerformanceCase(candidate: PerformanceCandidate): PerformanceCase {
-  const subject = scenarioSubject(candidate.title);
-  const config = categoryConfig(candidate.category, subject);
-
-  return {
-    module: candidate.section,
-    scenarioName: config.scenarioName,
-    performanceType: config.performanceType,
-    objective: config.objective,
-    preconditions: "测试环境、账号、监控和依赖服务已准备。",
-    concurrentUsers: PERFORMANCE_CONFIG.unknownTarget,
-    duration: "10min",
-    steps: ["准备压测脚本", "按目标负载执行压测", "记录吞吐、响应时间和错误率"],
-    targetThroughput: PERFORMANCE_CONFIG.unknownTarget,
-    actualThroughput: PERFORMANCE_CONFIG.pendingMetric,
-    avgResponseTime: PERFORMANCE_CONFIG.pendingMetric,
-    p95ResponseTime: PERFORMANCE_CONFIG.pendingMetric,
-    errorRate: PERFORMANCE_CONFIG.pendingMetric,
-  };
-}
-
-function categoryConfig(
-  category: PerformanceCategory,
-  subject: string
-): { scenarioName: string; performanceType: string; objective: string } {
-  switch (category) {
-    case "query":
-      return {
-        scenarioName: `${subject}查询性能测试`,
-        performanceType: "负载测试",
-        objective: `验证${subject}在目标数据量和预期并发下响应时间、吞吐量和错误率符合要求。`,
-      };
-    case "transaction":
-      return {
-        scenarioName: `${subject}事务压力测试`,
-        performanceType: "压力测试",
-        objective: `验证${subject}在逐步加压下的吞吐上限、错误率和事务成功率符合要求。`,
-      };
-    case "batch":
-      return {
-        scenarioName: `${subject}容量稳定性测试`,
-        performanceType: "容量测试",
-        objective: `验证${subject}在指定数据规模下处理耗时和资源消耗符合要求。`,
-      };
-    case "dependency":
-      return {
-        scenarioName: `${subject}依赖稳定性测试`,
-        performanceType: "稳定性测试",
-        objective: `验证${subject}在依赖服务波动时响应时间、失败率、超时、重试和降级行为符合要求。`,
-      };
-    case "core":
-      return {
-        scenarioName: `${subject}核心链路负载测试`,
-        performanceType: "负载测试",
-        objective: `验证${subject}在预期并发下响应时间、吞吐量和错误率符合要求。`,
-      };
-  }
-}
-
-function scenarioSubject(title: string): string {
-  const withoutIds = title.replace(/\b(?:REQ|TP|RISK)-\d+\b/g, "");
-  const withoutTemplateWords = withoutIds
-    .replace(/^覆盖\s*/, "")
-    .replace(/的主要成功路径。?$/, "")
-    .replace(/主要成功路径。?$/, "")
-    .replace(/系统给出正确反馈。?$/, "")
-    .trim();
-
-  return withoutTemplateWords || "核心业务流程";
-}
-
-function extractRequirementIds(text: string): string[] {
-  return [...new Set([...text.matchAll(/\bREQ-\d+\b/g)].map((match) => match[0]))];
-}
-
-function containsAny(text: string, keywords: string[]): boolean {
-  return keywords.some((keyword) => text.includes(keyword));
-}
-
-async function readOptional(path: string): Promise<string> {
-  try {
-    return await readFile(path, "utf8");
-  } catch {
-    return "";
-  }
-}
-
-async function readOptionalStat(path: string): Promise<{ mtimeMs: number } | undefined> {
-  try {
-    return await stat(path);
-  } catch {
-    return undefined;
-  }
 }

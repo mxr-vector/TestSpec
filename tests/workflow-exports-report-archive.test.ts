@@ -46,48 +46,36 @@ function workbookEntry(workbook: Record<string, Uint8Array>, path: string): Uint
 }
 
 describe("performance cases", () => {
-  it("generates compact performance cases from keyword rules", async () => {
+  it("generates global non-functional performance cases", async () => {
     const workspace = await createChangeWorkspace("checkout-v2");
-    await writeFile(
-      join(workspace.specsDir, WORKFLOW_FILES.testpoints),
-      [
-        "# 测试点清单：checkout-v2",
-        "",
-        "## 核心流程",
-        "",
-        "- [TP-001] 覆盖 REQ-001 商品搜索 的主要成功路径。",
-        "- [TP-002] 覆盖 REQ-002 提交订单 的主要成功路径。",
-        "- [TP-003] 覆盖 REQ-003 批量导出报表 的主要成功路径。",
-        "- [TP-004] 覆盖 REQ-004 第三方支付渠道回调 的主要成功路径。",
-        "- [TP-005] 覆盖 REQ-005 登录 的主要成功路径。",
-        "- [TP-006] 覆盖 REQ-006 消息队列同步 的主要成功路径。",
-      ].join("\n")
-    );
 
-    const cases = await generatePerformanceCases(workspace);
-    const artifactPath = join(workspace.artifactsDir, WORKFLOW_FILES.performanceCases);
-    const persistedCases = JSON.parse(await readFile(artifactPath, "utf8")) as typeof cases;
+    const cases = generatePerformanceCases();
 
-    expect(cases).toHaveLength(5);
-    expect(persistedCases).toHaveLength(5);
-    expect(persistedCases[0]).not.toHaveProperty("scenarioId");
-    expect(persistedCases[0]).not.toHaveProperty("testPointIds");
-    expect(persistedCases[0]).not.toHaveProperty("testData");
-    expect(persistedCases[0]).not.toHaveProperty("notes");
+    expect(cases).toHaveLength(9);
+    expect(cases[0]).not.toHaveProperty("scenarioId");
+    expect(cases[0]).not.toHaveProperty("testPointIds");
+    expect(cases[0]).not.toHaveProperty("testData");
+    expect(cases[0]).not.toHaveProperty("notes");
     expect(cases[0]).toMatchObject({
-      performanceType: "负载测试",
-      concurrentUsers: "待确认",
+      module: "全局非功能性",
+      performanceType: "基线测试",
       actualThroughput: "待执行后填写",
     });
     expect(cases[0]).not.toHaveProperty("requirementIds");
     expect(cases[0]).not.toHaveProperty("executionResult");
-    expect(cases[0]?.performanceType).toBe("负载测试");
-    expect(cases[1]?.performanceType).toBe("压力测试");
-    expect(cases[2]?.performanceType).toBe("容量测试");
-    expect(cases[3]?.performanceType).toBe("稳定性测试");
+    expect(cases[0]?.scenarioName).toBe("接口响应时间基线");
+    expect(cases[0]?.steps.length).toBeGreaterThanOrEqual(3);
+
+    const types = cases.map((c) => c.performanceType);
+    expect(types).toContain("基线测试");
+    expect(types).toContain("慢查询检测");
+    expect(types).toContain("泄漏检测");
+    expect(types).toContain("启动耗时");
+    expect(types).toContain("资源监控");
+    expect(types).toContain("安全性能");
   });
 
-  it("refreshes performance cases when source context changes", async () => {
+  it("merges agent-generated business cases with global non-functional cases", async () => {
     const workspace = await createChangeWorkspace("search-v2");
     await writeFile(
       join(workspace.specsDir, WORKFLOW_FILES.testpoints),
@@ -99,21 +87,102 @@ describe("performance cases", () => {
         "- [TP-001] 覆盖 REQ-001 搜索 的主要成功路径。",
       ].join("\n")
     );
-    await generatePerformanceCases(workspace);
+    // Simulate Agent-generated business performance cases
     await writeFile(
-      join(workspace.specsDir, WORKFLOW_FILES.testpoints),
-      [
-        "# 测试点清单：search-v2",
-        "",
-        "## 核心流程",
-        "",
-        "- [TP-001] 覆盖 REQ-001 批量导出 的主要成功路径。",
-      ].join("\n")
+      join(workspace.artifactsDir, WORKFLOW_FILES.performanceCases),
+      `${JSON.stringify(
+        [
+          {
+            module: "搜索模块",
+            scenarioName: "搜索查询负载测试",
+            performanceType: "负载测试",
+            objective: "验证搜索查询在高并发下的响应时间。",
+            preconditions: "测试环境已部署。",
+            concurrentUsers: "100",
+            duration: "10min",
+            steps: ["准备搜索关键词集", "以 100 并发执行搜索", "记录 P95 响应时间"],
+            targetThroughput: "≥ 500 QPS",
+            actualThroughput: "待执行后填写",
+            avgResponseTime: "待执行后填写",
+            p95ResponseTime: "待执行后填写",
+            errorRate: "待执行后填写",
+          },
+        ],
+        null,
+        2
+      )}\n`
     );
 
     const cases = await readOrGeneratePerformanceCases(workspace);
 
-    expect(cases[0]?.scenarioName).toContain("容量稳定性测试");
+    // 1 business case + 9 global cases = 10
+    expect(cases).toHaveLength(10);
+    expect(cases[0]?.scenarioName).toBe("搜索查询负载测试");
+    expect(cases[0]?.module).toBe("搜索模块");
+    expect(cases[9]?.module).toBe("全局非功能性");
+  });
+
+  it("sorts business cases before global cases in Excel output", async () => {
+    const workspace = await createChangeWorkspace("sort-test");
+    const businessCase: import("../src/workflow/performance.js").PerformanceCase = {
+      module: "搜索模块",
+      scenarioName: "搜索查询负载测试",
+      performanceType: "负载测试",
+      objective: "验证搜索查询在高并发下的响应时间。",
+      preconditions: "测试环境已部署。",
+      concurrentUsers: "100",
+      duration: "10min",
+      steps: ["准备搜索关键词集", "以 100 并发执行搜索", "记录 P95 响应时间"],
+      targetThroughput: "≥ 500 QPS",
+      actualThroughput: "待执行后填写",
+      avgResponseTime: "待执行后填写",
+      p95ResponseTime: "待执行后填写",
+      errorRate: "待执行后填写",
+    };
+    // Business case with a global performanceType name to test unified criteria
+    const edgeCaseBusinessWithGlobalType: import("../src/workflow/performance.js").PerformanceCase = {
+      module: "支付模块",
+      scenarioName: "支付安全性能验证",
+      performanceType: "安全性能",
+      objective: "验证支付接口的安全性能。",
+      preconditions: "测试环境已部署。",
+      concurrentUsers: "50",
+      duration: "5min",
+      steps: ["发送支付请求", "验证安全机制"],
+      targetThroughput: "待确认",
+      actualThroughput: "待执行后填写",
+      avgResponseTime: "待执行后填写",
+      p95ResponseTime: "待执行后填写",
+      errorRate: "待执行后填写",
+    };
+    const globalCases = generatePerformanceCases();
+    // Mix: global first, then business, to verify sorting reorders correctly
+    const mixedCases = [...globalCases, businessCase, edgeCaseBusinessWithGlobalType];
+
+    const workbookPath = join(workspace.artifactsDir, `sort-test_cases.xlsx`);
+    await writeExcelWorkbook(workbookPath, [], mixedCases);
+
+    const workbook = unzipSync(await readFile(workbookPath));
+    const performanceSheetXml = strFromU8(workbookEntry(workbook, "xl/worksheets/sheet2.xml"));
+
+    // Extract all row values for column A (module) from data rows (skip header row 1)
+    const moduleMatches = [...performanceSheetXml.matchAll(/<c r="A(\d+)"[^>]*><is><t>([^<]*)<\/t><\/is><\/c>/g)];
+    const dataModules = moduleMatches
+      .filter((m) => Number(m[1]) > 1)
+      .sort((a, b) => Number(a[1]) - Number(b[1]))
+      .map((m) => m[2]);
+
+    // Business cases should come first, global cases last
+    const firstGlobalIndex = dataModules.findIndex((m) => m === "全局非功能性");
+    const businessModules = dataModules.slice(0, firstGlobalIndex);
+    const globalModules = dataModules.slice(firstGlobalIndex);
+
+    expect(businessModules.length).toBe(2);
+    expect(businessModules).toContain("搜索模块");
+    // Edge case: business case with performanceType "安全性能" should NOT be sorted to global area
+    expect(businessModules).toContain("支付模块");
+    expect(globalModules.length).toBe(9);
+    expect(globalModules.every((m) => m === "全局非功能性")).toBe(true);
   });
 });
 
@@ -123,7 +192,7 @@ describe("structured cases and exports", () => {
     await writeTestPoints(workspace);
 
     const cases = await generateStructuredCases(workspace);
-    const performanceCases = await generatePerformanceCases(workspace);
+    const performanceCases = generatePerformanceCases();
     const workbookPath = join(workspace.artifactsDir, `login-v2${EXPORT_FILE_SUFFIXES.excelCases}`);
     await writeExcelWorkbook(workbookPath, cases, performanceCases);
     const rows = await readExecutionRows(workbookPath);

@@ -19,6 +19,7 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+import { PERFORMANCE_CONFIG } from "../core/config.js";
 import type { PerformanceCase } from "./performance.js";
 import type { TestCase } from "./testcases.js";
 
@@ -266,7 +267,14 @@ function functionalRows(cases: WorkbookTestCase[]): string[][] {
 }
 
 function performanceRows(cases: PerformanceCase[]): string[][] {
-  const sorted = [...cases].sort((a, b) => a.module.localeCompare(b.module));
+  const sorted = [...cases].sort((a, b) => {
+    const aIsGlobal = a.module === PERFORMANCE_CONFIG.globalModule;
+    const bIsGlobal = b.module === PERFORMANCE_CONFIG.globalModule;
+    if (aIsGlobal !== bIsGlobal) {
+      return aIsGlobal ? 1 : -1;
+    }
+    return a.module.localeCompare(b.module);
+  });
   return [
     [...PERFORMANCE_EXCEL_HEADERS],
     ...sorted.map((testCase) => [

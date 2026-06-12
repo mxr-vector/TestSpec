@@ -48,9 +48,34 @@ export const COMPACT_TEST_CASE_FIELDS = [
   "expectedResult",
 ] as const;
 
+/**
+ * 业务并发性能测试类型（Agent 通过 Skill 生成）
+ *
+ * 该常量由 `.agent/skills/testspec-performance/SKILL.md` 引用，
+ * 为 Agent 语义生成业务并发用例时提供 performanceType 值域约束。
+ * 代码中无直接消费方，但作为 Skill 配置的权威来源保留导出。
+ */
+export const BUSINESS_PERFORMANCE_TYPES = [
+  "负载测试",
+  "压力测试",
+  "并发测试",
+  "容量测试",
+  "稳定性测试",
+] as const;
+
+/** 全局非功能性性能测试类型（CLI 内置模板自动追加） */
+export const GLOBAL_PERFORMANCE_TYPES = [
+  "基线测试",
+  "慢查询检测",
+  "泄漏检测",
+  "启动耗时",
+  "资源监控",
+  "安全性能",
+] as const;
+
 /** 性能测试默认配置 */
 export const PERFORMANCE_CONFIG = {
-  maxCases: 5,
   unknownTarget: "待确认",
   pendingMetric: "待执行后填写",
+  globalModule: "全局非功能性",
 } as const;
